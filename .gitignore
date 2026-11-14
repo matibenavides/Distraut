@@ -9,6 +9,12 @@
 # testing
 /coverage
 
+
+# docs
+/docs
+
+AGENTS.md
+
 # misc
 .DS_Store
 *.pem
