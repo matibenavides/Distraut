@@ -1,8 +1,8 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { matchesFilter } from "../lib/matching"
-import type { Filter } from "../types/filter"
+import { matchesFilter, shouldHideVideo } from "../lib/matching"
+import type { Filter, StoredState } from "../types/filter"
 
 const keyword: Filter = {
   id: "1",
@@ -48,4 +48,53 @@ test("comparar no modifica el filtro ni los metadatos", () => {
   matchesFilter(keyword, video)
   assert.deepEqual(video, before)
   assert.equal(keyword.value, "programacion")
+})
+
+test("A08: otra regla activa mantiene la tarjeta oculta", () => {
+  const video = { title: "Programación con Ana", channelName: "Ana Aprende" }
+  const state: StoredState = {
+    schemaVersion: 1,
+    enabled: true,
+    filters: [keyword, channel]
+  }
+
+  assert.equal(shouldHideVideo(state, video), true)
+  assert.equal(
+    shouldHideVideo(
+      { ...state, filters: [{ ...keyword, enabled: false }, channel] },
+      video
+    ),
+    true
+  )
+  assert.equal(
+    shouldHideVideo(
+      {
+        ...state,
+        filters: [
+          { ...keyword, enabled: false },
+          { ...channel, enabled: false }
+        ]
+      },
+      video
+    ),
+    false
+  )
+})
+
+test("el interruptor general, lista vacía y metadatos ausentes no ocultan", () => {
+  const state: StoredState = {
+    schemaVersion: 1,
+    enabled: true,
+    filters: [keyword, channel]
+  }
+
+  assert.equal(
+    shouldHideVideo({ ...state, enabled: false }, { title: "Programación" }),
+    false
+  )
+  assert.equal(
+    shouldHideVideo({ ...state, filters: [] }, { title: "Programación" }),
+    false
+  )
+  assert.equal(shouldHideVideo(state, {}), false)
 })
