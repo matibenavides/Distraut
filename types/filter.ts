@@ -12,3 +12,8 @@ export interface StoredState {
   enabled: boolean
   filters: Filter[]
 }
+
+export interface VideoMetadata {
+  title?: string
+  channelName?: string
+}
