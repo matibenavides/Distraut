@@ -2,7 +2,12 @@ import assert from "node:assert/strict"
 import { test } from "node:test"
 import { parseHTML } from "linkedom"
 
-import { findVideoCards, readVideoMetadata } from "../lib/youtube-dom"
+import {
+  applyVideoFilters,
+  findVideoCards,
+  readVideoMetadata
+} from "../lib/youtube-dom"
+import type { StoredState } from "../types/filter"
 
 const lockup = (title: string, channel: string) => `
   <yt-lockup-view-model>
@@ -51,7 +56,7 @@ test("búsqueda: distingue videos de listas y lee el nombre del canal", () => {
   })
 })
 
-test("relacionados: acepta título sin canal y descarta tarjetas incompletas", () => {
+test("relacionados: conserva tarjetas incompletas para poder restaurarlas", () => {
   const { document } = parseHTML(`
     <ytd-watch-next-secondary-results-renderer>
       ${lockup("¿SQL o NoSQL?", "EDteam")}
@@ -64,7 +69,7 @@ test("relacionados: acepta título sin canal y descarta tarjetas incompletas", (
   `)
 
   const cards = findVideoCards(document)
-  assert.equal(cards.length, 2)
+  assert.equal(cards.length, 3)
   assert.deepEqual(readVideoMetadata(cards[0]), {
     title: "¿SQL o NoSQL?",
     channelName: "EDteam"
@@ -73,4 +78,39 @@ test("relacionados: acepta título sin canal y descarta tarjetas incompletas", (
     title: "Solo título",
     channelName: undefined
   })
+  assert.deepEqual(readVideoMetadata(cards[2]), {
+    title: undefined,
+    channelName: undefined
+  })
+})
+
+test("oculta y restaura el mismo nodo según filtros y metadatos actuales", () => {
+  const { document } = parseHTML(`
+    <ytd-rich-grid-renderer>
+      <ytd-rich-item-renderer lockup>${lockup("Programación con React", "Ána Aprende")}</ytd-rich-item-renderer>
+    </ytd-rich-grid-renderer>
+  `)
+  const card = findVideoCards(document)[0]
+  const state: StoredState = {
+    schemaVersion: 1,
+    enabled: true,
+    filters: [{ id: "1", type: "keyword", value: "programacion", enabled: true }]
+  }
+
+  applyVideoFilters(document, state)
+  assert.equal(card.classList.contains("distraut-hidden"), true)
+  assert.equal(document.contains(card), true)
+
+  applyVideoFilters(document, { ...state, enabled: false })
+  assert.equal(card.classList.contains("distraut-hidden"), false)
+
+  applyVideoFilters(document, state)
+  card.querySelector("h3")?.setAttribute("title", "Cocina con React")
+  applyVideoFilters(document, state)
+  assert.equal(card.classList.contains("distraut-hidden"), false)
+
+  card.querySelector('a[href^="/watch?v="]')?.removeAttribute("href")
+  card.querySelector("h3")?.setAttribute("title", "Programación con React")
+  applyVideoFilters(document, state)
+  assert.equal(card.classList.contains("distraut-hidden"), false)
 })

@@ -1,4 +1,6 @@
 import type { VideoMetadata } from "../types/filter"
+import type { StoredState } from "../types/filter"
+import { shouldHideVideo } from "./matching"
 
 const VIDEO_CARD_SELECTOR = [
   "ytd-rich-grid-renderer ytd-rich-item-renderer[lockup]",
@@ -24,9 +26,15 @@ export function readVideoMetadata(card: Element): VideoMetadata {
 }
 
 export function findVideoCards(root: ParentNode): Element[] {
-  return Array.from(root.querySelectorAll(VIDEO_CARD_SELECTOR)).filter(
-    (card) =>
-      card.querySelector('a[href^="/watch?v="]') &&
-      readVideoMetadata(card).title
-  )
+  return Array.from(root.querySelectorAll(VIDEO_CARD_SELECTOR))
+}
+
+export function applyVideoFilters(root: ParentNode, state: StoredState): void {
+  for (const card of findVideoCards(root)) {
+    const isVideo = Boolean(card.querySelector('a[href^="/watch?v="]'))
+    card.classList.toggle(
+      "distraut-hidden",
+      isVideo && shouldHideVideo(state, readVideoMetadata(card))
+    )
+  }
 }
