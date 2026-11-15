@@ -9,7 +9,7 @@
     "build": "plasmo build",
     "package": "plasmo package",
     "typecheck": "tsc --noEmit --incremental false",
-    "test": "tsc -p tsconfig.test.json && node --test build/tests/tests/filters.test.js"
+    "test": "tsc -p tsconfig.test.json && node --test build/tests/tests/*.test.js"
   },
   "dependencies": {
     "plasmo": "0.90.5",
@@ -26,8 +26,8 @@
     "typescript": "5.3.3"
   },
   "manifest": {
-    "host_permissions": [
-      "https://*/*"
+    "permissions": [
+      "storage"
     ]
   }
 }
