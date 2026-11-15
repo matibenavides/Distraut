@@ -5,6 +5,7 @@ import { parseHTML } from "linkedom"
 import {
   applyVideoFilters,
   findVideoCards,
+  observeVideoChanges,
   readVideoMetadata
 } from "../lib/youtube-dom"
 import type { StoredState } from "../types/filter"
@@ -94,7 +95,9 @@ test("oculta y restaura el mismo nodo según filtros y metadatos actuales", () =
   const state: StoredState = {
     schemaVersion: 1,
     enabled: true,
-    filters: [{ id: "1", type: "keyword", value: "programacion", enabled: true }]
+    filters: [
+      { id: "1", type: "keyword", value: "programacion", enabled: true }
+    ]
   }
 
   applyVideoFilters(document, state)
@@ -113,4 +116,49 @@ test("oculta y restaura el mismo nodo según filtros y metadatos actuales", () =
   card.querySelector("h3")?.setAttribute("title", "Programación con React")
   applyVideoFilters(document, state)
   assert.equal(card.classList.contains("distraut-hidden"), false)
+})
+
+test("procesa tarjetas nuevas y modificadas en una sola tanda", async () => {
+  const { document, window } = parseHTML(`
+    <ytd-rich-grid-renderer></ytd-rich-grid-renderer>
+    <nav></nav>
+  `)
+  const state: StoredState = {
+    schemaVersion: 1,
+    enabled: true,
+    filters: [{ id: "1", type: "keyword", value: "react", enabled: true }]
+  }
+  let runs = 0
+  const stop = observeVideoChanges(document, () => {
+    runs++
+    applyVideoFilters(document, state)
+  })
+  const grid = document.querySelector("ytd-rich-grid-renderer")!
+  grid.insertAdjacentHTML(
+    "beforeend",
+    `<ytd-rich-item-renderer lockup>${lockup("React básico", "Ana")}</ytd-rich-item-renderer>`
+  )
+  grid.insertAdjacentHTML(
+    "beforeend",
+    `<ytd-rich-item-renderer lockup>${lockup("Python básico", "Ana")}</ytd-rich-item-renderer>`
+  )
+  await new Promise((resolve) => setTimeout(resolve, 10))
+  const cards = findVideoCards(document)
+  assert.equal(runs, 1)
+  assert.equal(cards[0].classList.contains("distraut-hidden"), true)
+  assert.equal(cards[1].classList.contains("distraut-hidden"), false)
+
+  cards[0].querySelector("h3")?.setAttribute("title", "Python avanzado")
+  await new Promise((resolve) => setTimeout(resolve, 10))
+  assert.equal(runs, 2)
+  assert.equal(cards[0].classList.contains("distraut-hidden"), false)
+
+  document.querySelector("nav")?.setAttribute("title", "Sin relación")
+  await new Promise((resolve) => setTimeout(resolve, 10))
+  assert.equal(runs, 2)
+
+  document.dispatchEvent(new window.Event("yt-navigate-finish"))
+  await new Promise((resolve) => setTimeout(resolve, 10))
+  assert.equal(runs, 3)
+  stop()
 })

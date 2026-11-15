@@ -1,5 +1,4 @@
-import type { VideoMetadata } from "../types/filter"
-import type { StoredState } from "../types/filter"
+import type { StoredState, VideoMetadata } from "../types/filter"
 import { shouldHideVideo } from "./matching"
 
 const VIDEO_CARD_SELECTOR = [
@@ -7,6 +6,8 @@ const VIDEO_CARD_SELECTOR = [
   "ytd-search ytd-video-renderer[is-search]",
   "ytd-watch-next-secondary-results-renderer yt-lockup-view-model"
 ].join(", ")
+const VIDEO_SURFACE_SELECTOR =
+  "ytd-rich-grid-renderer, ytd-search, ytd-watch-next-secondary-results-renderer"
 
 export function readVideoMetadata(card: Element): VideoMetadata {
   const titleElement = card.querySelector(
@@ -36,5 +37,60 @@ export function applyVideoFilters(root: ParentNode, state: StoredState): void {
       "distraut-hidden",
       isVideo && shouldHideVideo(state, readVideoMetadata(card))
     )
+  }
+}
+
+export function observeVideoChanges(
+  document: Document,
+  onChange: () => void
+): () => void {
+  let timer: ReturnType<typeof setTimeout> | undefined
+
+  function schedule(): void {
+    if (timer !== undefined) return
+    timer = setTimeout(() => {
+      timer = undefined
+      onChange()
+    }, 0)
+  }
+
+  const Observer = document.defaultView?.MutationObserver ?? MutationObserver
+  const observer = new Observer((records) => {
+    if (
+      records.some((record) => {
+        const target =
+          record.target.nodeType === 1
+            ? (record.target as Element)
+            : record.target.parentElement
+        if (target?.closest(VIDEO_SURFACE_SELECTOR)) return true
+        return Array.from(record.addedNodes).some((node) => {
+          if (node.nodeType !== 1) return false
+          const element = node as Element
+          return (
+            element.matches(VIDEO_SURFACE_SELECTOR) ||
+            element.matches(VIDEO_CARD_SELECTOR) ||
+            Boolean(element.querySelector(VIDEO_SURFACE_SELECTOR)) ||
+            Boolean(element.querySelector(VIDEO_CARD_SELECTOR))
+          )
+        })
+      })
+    ) {
+      schedule()
+    }
+  })
+
+  observer.observe(document, {
+    subtree: true,
+    childList: true,
+    characterData: true,
+    attributes: true,
+    attributeFilter: ["title", "href", "lockup", "is-search"]
+  })
+  document.addEventListener("yt-navigate-finish", schedule)
+
+  return () => {
+    observer.disconnect()
+    document.removeEventListener("yt-navigate-finish", schedule)
+    if (timer !== undefined) clearTimeout(timer)
   }
 }

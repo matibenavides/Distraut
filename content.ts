@@ -1,7 +1,8 @@
 import type { PlasmoCSConfig } from "plasmo"
 
 import { getStoredState, subscribeToStoredState } from "./lib/storage"
-import { applyVideoFilters } from "./lib/youtube-dom"
+import { applyVideoFilters, observeVideoChanges } from "./lib/youtube-dom"
+import type { StoredState } from "./types/filter"
 
 export const config: PlasmoCSConfig = {
   matches: ["https://www.youtube.com/*"],
@@ -9,8 +10,14 @@ export const config: PlasmoCSConfig = {
 }
 
 let stateChanged = false
+let currentState: StoredState | undefined
+
+observeVideoChanges(document, () => {
+  if (currentState) applyVideoFilters(document, currentState)
+})
 
 function reportError(error: Error): void {
+  currentState = undefined
   console.error("Distraut: no se pudieron leer los filtros.", error)
   document.querySelectorAll(".distraut-hidden").forEach((card) => {
     card.classList.remove("distraut-hidden")
@@ -20,6 +27,7 @@ function reportError(error: Error): void {
 subscribeToStoredState(
   (state) => {
     stateChanged = true
+    currentState = state
     applyVideoFilters(document, state)
   },
   (error) => {
@@ -30,7 +38,10 @@ subscribeToStoredState(
 
 getStoredState()
   .then((state) => {
-    if (!stateChanged) applyVideoFilters(document, state)
+    if (!stateChanged) {
+      currentState = state
+      applyVideoFilters(document, state)
+    }
   })
   .catch((error) => {
     if (!stateChanged) reportError(error)
