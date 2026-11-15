@@ -7,7 +7,10 @@ export async function getStoredState(): Promise<StoredState> {
   const stored: unknown = (await chrome.storage.local.get(STORAGE_KEY))[
     STORAGE_KEY
   ]
+  return parseStoredState(stored)
+}
 
+function parseStoredState(stored: unknown): StoredState {
   if (stored === undefined) {
     return { schemaVersion: 1, enabled: true, filters: [] }
   }
@@ -27,6 +30,30 @@ export async function getStoredState(): Promise<StoredState> {
   }
 
   return stored as StoredState
+}
+
+export function subscribeToStoredState(
+  onChange: (state: StoredState) => void,
+  onError: (error: Error) => void
+): () => void {
+  const listener = (
+    changes: { [key: string]: chrome.storage.StorageChange },
+    area: string
+  ) => {
+    if (area !== "local" || !(STORAGE_KEY in changes)) return
+
+    let state: StoredState
+    try {
+      state = parseStoredState(changes[STORAGE_KEY].newValue)
+    } catch (error) {
+      onError(error instanceof Error ? error : new Error(String(error)))
+      return
+    }
+    onChange(state)
+  }
+
+  chrome.storage.onChanged.addListener(listener)
+  return () => chrome.storage.onChanged.removeListener(listener)
 }
 
 function isFilter(value: unknown): value is Filter {

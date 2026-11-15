@@ -6,22 +6,41 @@ import {
   getStoredState,
   removeFilter,
   setFilterEnabled,
-  setFilteringEnabled
+  setFilteringEnabled,
+  subscribeToStoredState
 } from "../lib/storage"
+import type { StoredState } from "../types/filter"
 
 let values: Record<string, unknown>
 let failWrite: boolean
+type Listener = (
+  changes: Record<string, chrome.storage.StorageChange>,
+  area: string
+) => void
+let listeners: Set<Listener>
 
 beforeEach(() => {
   values = {}
   failWrite = false
+  listeners = new Set()
   globalThis.chrome = {
     storage: {
+      onChanged: {
+        addListener: (listener: Listener) => listeners.add(listener),
+        removeListener: (listener: Listener) => listeners.delete(listener)
+      },
       local: {
         get: async (key: string) => ({ [key]: values[key] }),
         set: async (items: Record<string, unknown>) => {
           if (failWrite) throw new Error("No se pudo guardar")
+          const oldValue = values.distrautState
           Object.assign(values, structuredClone(items))
+          for (const listener of listeners) {
+            listener(
+              { distrautState: { oldValue, newValue: values.distrautState } },
+              "local"
+            )
+          }
         }
       }
     }
@@ -74,4 +93,39 @@ test("rechaza identificadores desconocidos sin escribir", async () => {
   await assert.rejects(setFilterEnabled("no-existe", false), /No se encontró/)
   await assert.rejects(removeFilter("no-existe"), /No se encontró/)
   assert.deepEqual(values, {})
+})
+
+test("avisa cambios locales, informa datos inválidos y limpia la suscripción", async () => {
+  const received: StoredState[] = []
+  const errors: Error[] = []
+  const unsubscribe = subscribeToStoredState(
+    (state) => received.push(state),
+    (error) => errors.push(error)
+  )
+
+  await addFilter("keyword", "React")
+  assert.equal(received.length, 1)
+  assert.equal(received[0].filters[0].value, "React")
+
+  for (const listener of listeners) {
+    listener({ distrautState: { newValue: { schemaVersion: 2 } } }, "local")
+    listener({ distrautState: { newValue: {} } }, "sync")
+    listener({ otherKey: { newValue: {} } }, "local")
+  }
+  assert.equal(errors.length, 1)
+  assert.match(errors[0].message, /formato no compatible/)
+  assert.equal(received.length, 1)
+
+  for (const listener of listeners) {
+    listener({ distrautState: { newValue: undefined } }, "local")
+  }
+  assert.deepEqual(received[1], {
+    schemaVersion: 1,
+    enabled: true,
+    filters: []
+  })
+
+  unsubscribe()
+  await setFilteringEnabled(false)
+  assert.equal(received.length, 2)
 })
