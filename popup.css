@@ -1,0 +1,89 @@
+html,
+body {
+  width: 380px;
+  margin: 0;
+}
+
+.popup {
+  box-sizing: border-box;
+  width: 380px;
+  min-height: 320px;
+  padding: 24px;
+  background: #f6f2ff;
+  color: #302747;
+}
+
+.popup-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.brand-mark {
+  display: grid;
+  flex: 0 0 46px;
+  place-items: center;
+  height: 46px;
+  border-radius: 15px;
+  background: #6141b8;
+  color: white;
+  font-size: 23px;
+}
+
+.popup .popup-title.ant-typography {
+  margin: 0;
+  color: #302747;
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+.popup-subtitle {
+  font-size: 12px;
+}
+
+.popup-panel {
+  padding: 20px;
+  border: 1px solid #e7dff9;
+  border-radius: 18px;
+  background: white;
+  box-shadow: 0 8px 24px rgb(78 49 141 / 6%);
+}
+
+.panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.popup .panel-heading .ant-typography {
+  margin: 0;
+  font-size: 17px;
+}
+
+.popup-panel p {
+  margin: 14px 0 20px;
+  color: #625a73;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.coming-soon {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 10px;
+  background: #e2f7ee;
+  color: #235d4e;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.coming-soon-dot {
+  flex: 0 0 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #257c65;
+}
