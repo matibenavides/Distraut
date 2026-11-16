@@ -6,7 +6,7 @@ import type { StoredState } from "./types/filter"
 
 export const config: PlasmoCSConfig = {
   matches: ["https://www.youtube.com/*"],
-  css: ["content.css"]
+  css: ["styles/youtube.css"]
 }
 
 let stateChanged = false

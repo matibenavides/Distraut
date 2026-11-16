@@ -16,7 +16,25 @@ npm run dev
 
 Open your browser and load the appropriate development build. For example, if you are developing for the chrome browser, using manifest v3, use: `build/chrome-mv3-dev`.
 
-You can start editing the popup by modifying `popup.tsx`. It should auto-update as you make changes. To add an options page, simply add a `options.tsx` file to the root of the project, with a react component default exported. Likewise to add a content page, add a `content.ts` file to the root of the project, importing some module and do some logic, then reload the extension on your browser.
+You can start editing the popup in `popup/index.tsx`. Plasmo recognizes this directory entry automatically. Its stylesheet and Ant Design theme live alongside it in `popup/popup.css` and `popup/theme.ts`. The YouTube content script is `content.ts`, with injected CSS in `styles/youtube.css`. After rebuilding content scripts, reload the extension and the YouTube page.
+
+## Source layout
+
+```text
+popup/
+  index.tsx       # Plasmo popup entry and React view
+  popup.css       # Popup layout and surfaces
+  theme.ts        # Ant Design tokens
+content.ts        # Plain TypeScript entry for YouTube
+styles/
+  youtube.css     # Reversible hiding class injected into YouTube
+lib/              # Validation, matching, storage and DOM adapters
+types/            # Data contracts and CSS import declaration
+tests/            # Logic and DOM fixtures
+design/           # Visual direction and sketch brief
+```
+
+The popup directory is an official [Plasmo extension page convention](https://docs.plasmo.com/framework/ext-pages). Other folder names organize this project; Plasmo does not require them. Keep React and Ant Design imports inside the popup. Add components when an actual feature needs them.
 
 For further guidance, [visit our Documentation](https://docs.plasmo.com/)
 

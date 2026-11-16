@@ -1,21 +1,13 @@
 import { FilterOutlined } from "@ant-design/icons"
 import { ConfigProvider, Tag, Typography } from "antd"
 
+import { popupTheme } from "./theme"
+
 import "./popup.css"
 
 function IndexPopup() {
   return (
-    <ConfigProvider
-      theme={{
-        token: {
-          colorPrimary: "#6141b8",
-          colorText: "#302747",
-          colorTextSecondary: "#625a73",
-          colorSuccess: "#257c65",
-          borderRadius: 12,
-          fontFamily: "system-ui, -apple-system, Segoe UI, sans-serif"
-        }
-      }}>
+    <ConfigProvider theme={popupTheme}>
       <main className="popup">
         <header className="popup-header">
           <div className="brand-mark" aria-hidden="true">
