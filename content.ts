@@ -11,6 +11,22 @@ export const config: PlasmoCSConfig = {
 
 let stateChanged = false
 let currentState: StoredState | undefined
+let expiryTimer: ReturnType<typeof setTimeout> | undefined
+
+function receiveState(state: StoredState): void {
+  currentState = state
+  clearTimeout(expiryTimer)
+  applyVideoFilters(document, state)
+  if (state.session && state.session.endsAt > Date.now()) {
+    expiryTimer = setTimeout(() => {
+      if (currentState) applyVideoFilters(document, currentState)
+    }, state.session.endsAt - Date.now())
+  }
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (currentState) applyVideoFilters(document, currentState)
+})
 
 observeVideoChanges(document, () => {
   if (currentState) applyVideoFilters(document, currentState)
@@ -18,6 +34,7 @@ observeVideoChanges(document, () => {
 
 function reportError(error: Error): void {
   currentState = undefined
+  clearTimeout(expiryTimer)
   console.error("Distraut: no se pudieron leer los filtros.", error)
   document.querySelectorAll(".distraut-hidden").forEach((card) => {
     card.classList.remove("distraut-hidden")
@@ -27,8 +44,7 @@ function reportError(error: Error): void {
 subscribeToStoredState(
   (state) => {
     stateChanged = true
-    currentState = state
-    applyVideoFilters(document, state)
+    receiveState(state)
   },
   (error) => {
     stateChanged = true
@@ -39,8 +55,7 @@ subscribeToStoredState(
 getStoredState()
   .then((state) => {
     if (!stateChanged) {
-      currentState = state
-      applyVideoFilters(document, state)
+      receiveState(state)
     }
   })
   .catch((error) => {

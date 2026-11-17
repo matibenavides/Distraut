@@ -1,5 +1,10 @@
-import type { Filter, FilterType, StoredState } from "../types/filter"
-import { createFilter } from "./filters"
+import type {
+  Filter,
+  FilterCollection,
+  FilterType,
+  StoredState
+} from "../types/filter"
+import { createFilter, normalizeFilterValue } from "./filters"
 
 const STORAGE_KEY = "distrautState"
 
@@ -24,12 +29,52 @@ function parseStoredState(stored: unknown): StoredState {
     typeof stored.enabled !== "boolean" ||
     !("filters" in stored) ||
     !Array.isArray(stored.filters) ||
-    !stored.filters.every(isFilter)
+    !stored.filters.every(isFilter) ||
+    ("collections" in stored &&
+      (!Array.isArray(stored.collections) ||
+        !stored.collections.every(isCollection)))
   ) {
     throw new Error("Los filtros guardados tienen un formato no compatible.")
   }
 
-  return stored as StoredState
+  const state = stored as StoredState
+  if (state.session !== undefined) {
+    const session = state.session
+    if (
+      typeof session !== "object" ||
+      session === null ||
+      !Number.isFinite(session.startedAt) ||
+      !Number.isFinite(session.endsAt) ||
+      session.endsAt <= session.startedAt ||
+      session.endsAt - session.startedAt > 240 * 60000
+    )
+      throw new Error("La sesión guardada tiene un formato no compatible.")
+  }
+  const ids = new Set(state.collections?.map((group) => group.id))
+  if (
+    ids.size !== (state.collections?.length ?? 0) ||
+    state.filters.some(
+      (filter) =>
+        filter.collectionId !== undefined && !ids.has(filter.collectionId)
+    )
+  )
+    throw new Error("Los filtros guardados tienen una colección no compatible.")
+  return state
+}
+
+function isCollection(value: unknown): value is FilterCollection {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "id" in value &&
+    typeof value.id === "string" &&
+    !!value.id &&
+    "name" in value &&
+    typeof value.name === "string" &&
+    !!value.name.trim() &&
+    "enabled" in value &&
+    typeof value.enabled === "boolean"
+  )
 }
 
 export function subscribeToStoredState(
@@ -66,55 +111,132 @@ function isFilter(value: unknown): value is Filter {
     (value.type === "keyword" || value.type === "channel") &&
     "value" in value &&
     typeof value.value === "string" &&
+    (!("collectionId" in value) || typeof value.collectionId === "string") &&
     "enabled" in value &&
     typeof value.enabled === "boolean"
   )
 }
 
-async function saveState(state: StoredState): Promise<StoredState> {
-  await chrome.storage.local.set({ [STORAGE_KEY]: state })
-  return state
+function updateState(
+  change: (state: StoredState) => StoredState
+): Promise<StoredState> {
+  return navigator.locks.request(STORAGE_KEY, async () => {
+    const state = change(await getStoredState())
+    await chrome.storage.local.set({ [STORAGE_KEY]: state })
+    return state
+  })
 }
 
 export async function addFilter(
   type: FilterType,
-  value: string
+  value: string,
+  collectionId?: string
 ): Promise<StoredState> {
-  const state = await getStoredState()
-  const filter = createFilter(type, value, state.filters)
-  return saveState({ ...state, filters: [...state.filters, filter] })
+  return updateState((state) => {
+    if (collectionId !== undefined) requireCollection(state, collectionId)
+    const filter = createFilter(
+      type,
+      value,
+      state.filters.filter((f) => f.collectionId === collectionId)
+    )
+    if (collectionId !== undefined) filter.collectionId = collectionId
+    return { ...state, filters: [...state.filters, filter] }
+  })
 }
 
 export async function setFilterEnabled(
   id: string,
   enabled: boolean
 ): Promise<StoredState> {
-  const state = await getStoredState()
-  if (!state.filters.some((filter) => filter.id === id)) {
-    throw new Error("No se encontró el filtro.")
-  }
-  return saveState({
-    ...state,
-    filters: state.filters.map((filter) =>
-      filter.id === id ? { ...filter, enabled } : filter
-    )
+  return updateState((state) => {
+    if (!state.filters.some((filter) => filter.id === id)) {
+      throw new Error("No se encontró el filtro.")
+    }
+    return {
+      ...state,
+      filters: state.filters.map((filter) =>
+        filter.id === id ? { ...filter, enabled } : filter
+      )
+    }
   })
 }
 
 export async function removeFilter(id: string): Promise<StoredState> {
-  const state = await getStoredState()
-  if (!state.filters.some((filter) => filter.id === id)) {
-    throw new Error("No se encontró el filtro.")
-  }
-  return saveState({
-    ...state,
-    filters: state.filters.filter((filter) => filter.id !== id)
+  return updateState((state) => {
+    if (!state.filters.some((filter) => filter.id === id)) {
+      throw new Error("No se encontró el filtro.")
+    }
+    return {
+      ...state,
+      filters: state.filters.filter((filter) => filter.id !== id)
+    }
   })
 }
 
 export async function setFilteringEnabled(
   enabled: boolean
 ): Promise<StoredState> {
-  const state = await getStoredState()
-  return saveState({ ...state, enabled })
+  return updateState((state) => ({ ...state, enabled }))
+}
+
+export function startStudySession(minutes: number) {
+  if (!Number.isInteger(minutes) || minutes < 1 || minutes > 240)
+    return Promise.reject(new Error("Elige una duración de 1 a 240 minutos."))
+  return updateState((state) => {
+    const startedAt = Date.now()
+    return {
+      ...state,
+      enabled: true,
+      session: { startedAt, endsAt: startedAt + minutes * 60000 }
+    }
+  })
+}
+
+export function endStudySession() {
+  return updateState(({ session, ...state }) => ({ ...state, enabled: false }))
+}
+
+export function useUntimedFiltering() {
+  return updateState(({ session, ...state }) => ({ ...state, enabled: true }))
+}
+
+function requireCollection(state: StoredState, id: string) {
+  const group = state.collections?.find((group) => group.id === id)
+  if (!group) throw new Error("No se encontró la colección.")
+  return group
+}
+
+export function addCollection(name: string) {
+  return updateState((state) => {
+    const groups = state.collections ?? []
+    const normalized = normalizeFilterValue(name)
+    if (!normalized) throw new Error("Escribe un nombre para la colección.")
+    if (groups.some((group) => normalizeFilterValue(group.name) === normalized))
+      throw new Error("Ya existe una colección con ese nombre.")
+    const group = { id: crypto.randomUUID(), name: name.trim(), enabled: true }
+    return { ...state, collections: [...groups, group] }
+  })
+}
+
+export function setCollectionEnabled(id: string, enabled: boolean) {
+  return updateState((state) => {
+    requireCollection(state, id)
+    return {
+      ...state,
+      collections: state.collections!.map((group) =>
+        group.id === id ? { ...group, enabled } : group
+      )
+    }
+  })
+}
+
+export function removeCollection(id: string) {
+  return updateState((state) => {
+    requireCollection(state, id)
+    return {
+      ...state,
+      collections: state.collections!.filter((group) => group.id !== id),
+      filters: state.filters.filter((filter) => filter.collectionId !== id)
+    }
+  })
 }

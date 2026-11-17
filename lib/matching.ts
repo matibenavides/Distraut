@@ -28,8 +28,15 @@ export function shouldHideVideo(
 ): boolean {
   return (
     state.enabled &&
+    (!state.session || Date.now() < state.session.endsAt) &&
     state.filters.some(
-      (filter) => filter.enabled && matchesFilter(filter, video)
+      (filter) =>
+        filter.enabled &&
+        (!filter.collectionId ||
+          state.collections?.some(
+            (group) => group.id === filter.collectionId && group.enabled
+          )) &&
+        matchesFilter(filter, video)
     )
   )
 }

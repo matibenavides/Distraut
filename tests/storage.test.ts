@@ -1,13 +1,20 @@
 import assert from "node:assert/strict"
 import { beforeEach, test } from "node:test"
 
+import { shouldHideVideo } from "../lib/matching"
 import {
+  addCollection,
   addFilter,
+  endStudySession,
   getStoredState,
+  removeCollection,
   removeFilter,
+  setCollectionEnabled,
   setFilterEnabled,
   setFilteringEnabled,
-  subscribeToStoredState
+  startStudySession,
+  subscribeToStoredState,
+  useUntimedFiltering
 } from "../lib/storage"
 import type { StoredState } from "../types/filter"
 
@@ -18,6 +25,71 @@ type Listener = (
   area: string
 ) => void
 let listeners: Set<Listener>
+
+test("el reloj persiste, vence y se puede finalizar sin borrar filtros", async () => {
+  await addFilter("keyword", "React")
+  await assert.rejects(startStudySession(0), /duración/)
+  await assert.rejects(startStudySession(241), /duración/)
+  await assert.rejects(startStudySession(1.5), /duración/)
+  await startStudySession(25)
+  const state = await getStoredState()
+  assert.equal(state.session!.endsAt - state.session!.startedAt, 25 * 60000)
+  assert.equal(shouldHideVideo(state, { title: "React" }), true)
+  const ended = {
+    ...state,
+    session: { startedAt: Date.now() - 60001, endsAt: Date.now() - 1 }
+  }
+  assert.equal(shouldHideVideo(ended, { title: "React" }), false)
+  await setFilteringEnabled(false)
+  assert.deepEqual((await getStoredState()).session, state.session)
+  assert.equal((await endStudySession()).enabled, false)
+  const untimed = await useUntimedFiltering()
+  assert.equal(untimed.session, undefined)
+  assert.equal(shouldHideVideo(untimed, { title: "React" }), true)
+  values.distrautState = {
+    ...untimed,
+    session: { startedAt: 1, endsAt: "invalid" }
+  }
+  await assert.rejects(getStoredState(), /sesión guardada/)
+})
+
+test("conserva reglas antiguas y gestiona cada aparición solo en su origen", async () => {
+  const legacy = {
+    id: "previo",
+    value: "Juego",
+    type: "keyword",
+    enabled: true
+  }
+  values.distrautState = { schemaVersion: 1, enabled: true, filters: [legacy] }
+  const group = (await addCollection("Juegos")).collections![0]
+  await assert.rejects(addCollection(" juégos "), /Ya existe/)
+  await Promise.all([
+    addFilter("keyword", "juego", group.id),
+    addFilter("channel", "Canal", group.id)
+  ])
+  await assert.rejects(addFilter("keyword", "juégo", group.id), /Ya existe/)
+  const state = await setCollectionEnabled(group.id, false)
+  assert.equal(shouldHideVideo(state, { title: "Juego" }), true)
+  assert.equal(shouldHideVideo(state, { channelName: "Canal" }), false)
+  const entry = state.filters.find(
+    (f) => f.collectionId && f.type === "keyword"
+  )!
+  await setFilterEnabled(entry.id, false)
+  await removeFilter("previo")
+  const resumed = await setCollectionEnabled(group.id, true)
+  assert.equal(shouldHideVideo(resumed, { title: "Juego" }), false)
+  assert.equal(shouldHideVideo(resumed, { channelName: "Canal" }), true)
+  await addFilter("channel", "Canal")
+  const remaining = await removeCollection(group.id)
+  assert.deepEqual(
+    remaining.filters.map((f) => f.collectionId),
+    [undefined]
+  )
+  await assert.rejects(
+    addFilter("keyword", "React", group.id),
+    /No se encontró/
+  )
+})
 
 beforeEach(() => {
   values = {}

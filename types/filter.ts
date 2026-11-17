@@ -5,12 +5,21 @@ export interface Filter {
   type: FilterType
   value: string
   enabled: boolean
+  collectionId?: string
+}
+
+export interface FilterCollection {
+  id: string
+  name: string
+  enabled: boolean
 }
 
 export interface StoredState {
   schemaVersion: 1
   enabled: boolean
   filters: Filter[]
+  collections?: FilterCollection[]
+  session?: { startedAt: number; endsAt: number }
 }
 
 export interface VideoMetadata {
