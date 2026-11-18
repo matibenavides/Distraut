@@ -24,7 +24,8 @@ export function RuleLibrary({
   const [page, setPage] = useState(0)
   const groups = state.collections ?? []
   const effectiveOrigin =
-    origin === individual || groups.some((g) => g.id === origin) ? origin : ""
+    initialOrigin ||
+    (origin === individual || groups.some((g) => g.id === origin) ? origin : "")
   const inOrigin = state.filters.filter(
     (rule) =>
       !effectiveOrigin || (rule.collectionId ?? individual) === effectiveOrigin
@@ -41,23 +42,29 @@ export function RuleLibrary({
     <>
       <AddFilter state={state} save={save} collectionId={initialOrigin} />
       <section>
-        <h2>Filtros guardados</h2>
-        <label htmlFor="origin">Mostrar filtros de</label>
-        <select
-          id="origin"
-          value={effectiveOrigin}
-          onChange={(e) => {
-            setOrigin(e.target.value)
-            setPage(0)
-          }}>
-          <option value="">Todas las colecciones e individuales</option>
-          <option value={individual}>Filtros individuales</option>
-          {groups.map((g) => (
-            <option key={g.id} value={g.id}>
-              {g.name}
-            </option>
-          ))}
-        </select>
+        <h2>
+          {initialOrigin ? "Filtros de esta colección" : "Filtros guardados"}
+        </h2>
+        {!initialOrigin && (
+          <>
+            <label htmlFor="origin">Mostrar filtros de</label>
+            <select
+              id="origin"
+              value={effectiveOrigin}
+              onChange={(e) => {
+                setOrigin(e.target.value)
+                setPage(0)
+              }}>
+              <option value="">Todas las colecciones e individuales</option>
+              <option value={individual}>Filtros individuales</option>
+              {groups.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name}
+                </option>
+              ))}
+            </select>
+          </>
+        )}
         <label htmlFor="saved-search">Buscar entre los filtros guardados</label>
         <input
           id="saved-search"

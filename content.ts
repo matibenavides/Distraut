@@ -1,5 +1,6 @@
 import type { PlasmoCSConfig } from "plasmo"
 
+import { getSessionTiming } from "./lib/session"
 import { getStoredState, subscribeToStoredState } from "./lib/storage"
 import { applyVideoFilters, observeVideoChanges } from "./lib/youtube-dom"
 import type { StoredState } from "./types/filter"
@@ -17,15 +18,19 @@ function receiveState(state: StoredState): void {
   currentState = state
   clearTimeout(expiryTimer)
   applyVideoFilters(document, state)
-  if (state.session && state.session.endsAt > Date.now()) {
-    expiryTimer = setTimeout(() => {
-      if (currentState) applyVideoFilters(document, currentState)
-    }, state.session.endsAt - Date.now())
+  const timing = getSessionTiming(state.session)
+  if (timing && !timing.finished && !timing.paused) {
+    expiryTimer = setTimeout(
+      () => {
+        if (currentState) receiveState(currentState)
+      },
+      Math.max(1, timing.nextBoundary - Date.now())
+    )
   }
 }
 
 document.addEventListener("visibilitychange", () => {
-  if (currentState) applyVideoFilters(document, currentState)
+  if (currentState) receiveState(currentState)
 })
 
 observeVideoChanges(document, () => {

@@ -1,5 +1,6 @@
 import type { Filter, StoredState, VideoMetadata } from "../types/filter"
 import { normalizeFilterValue } from "./filters"
+import { getSessionTiming } from "./session"
 
 export function matchesFilter(filter: Filter, video: VideoMetadata): boolean {
   const value = normalizeFilterValue(filter.value)
@@ -26,9 +27,10 @@ export function shouldHideVideo(
   state: StoredState,
   video: VideoMetadata
 ): boolean {
+  const timing = getSessionTiming(state.session)
   return (
     state.enabled &&
-    (!state.session || Date.now() < state.session.endsAt) &&
+    (!timing || (!timing.finished && !timing.paused && !timing.resting)) &&
     state.filters.some(
       (filter) =>
         filter.enabled &&

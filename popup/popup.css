@@ -64,7 +64,7 @@ input,
 select {
   font: inherit;
 }
-button:not(.ant-switch) {
+button:not(.ant-switch):not(.ant-btn) {
   border: 0;
   background: transparent;
   padding: 6px;
@@ -73,7 +73,7 @@ button:not(.ant-switch) {
   font-weight: 600;
   cursor: pointer;
 }
-button:not(.ant-switch):hover {
+button:not(.ant-switch):not(.ant-btn):hover {
   background: #eee6f6;
 }
 button:disabled {
@@ -84,12 +84,12 @@ button:disabled {
   outline: 2px solid #6141b8;
   outline-offset: 2px;
 }
-button.primary {
+.popup button.primary {
   background: #65449a;
   color: white;
   padding: 8px 14px;
 }
-button.primary:hover {
+.popup button.primary:hover {
   background: #51347f;
 }
 button.pill,
@@ -242,4 +242,62 @@ label {
 }
 .create-form h2 {
   margin-bottom: 8px;
+}
+
+.popup-collection {
+  background: #eff8f3;
+  border-top: 5px solid #43846c;
+}
+.collection-context {
+  color: #2b5c48;
+  margin: 8px 0 18px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #c7dfd1;
+}
+.popup-collection h1 {
+  overflow-wrap: anywhere;
+  line-height: 1.2;
+}
+.session-panel[data-phase="break"] {
+  background: #def1e6;
+}
+.session-clock .ant-statistic-content {
+  font-size: 40px;
+  font-variant-numeric: tabular-nums;
+  color: #30293f;
+}
+.session-clock .ant-statistic-title {
+  color: #625b70;
+  font-size: 12px;
+}
+.session-actions {
+  justify-content: flex-start;
+}
+.session-help {
+  margin-top: 12px;
+}
+.duration-picker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 12px 0 16px;
+}
+.duration-picker .ant-input-number {
+  width: 150px;
+}
+.session-panel .duration-picker .ant-input-number-input {
+  text-align: center;
+  font-size: 32px;
+  width: 100%;
+  padding: 8px;
+}
+.duration-picker .ant-btn {
+  width: 40px;
+  height: 40px;
+  font-size: 22px;
+}
+.duration-summary {
+  font-size: 12px;
+  margin: 10px 0 14px;
 }

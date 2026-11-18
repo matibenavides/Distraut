@@ -1,7 +1,10 @@
+import { Button, Checkbox, InputNumber, Statistic } from "antd"
 import { useState } from "react"
 
+import { getSessionTiming } from "../lib/session"
 import {
   endStudySession,
+  setStudySessionPaused,
   startStudySession,
   useUntimedFiltering
 } from "../lib/storage"
@@ -17,86 +20,148 @@ export function StudySession({
   save: Save
   now: number
 }) {
-  const [minutes, setMinutes] = useState("25")
-  const session = state.session
-  const remaining = session
-    ? Math.max(0, Math.ceil((session.endsAt - now) / 1000))
-    : 0
-  const active = !!session && remaining > 0
-  const clock = `${Math.floor(remaining / 60)
-    .toString()
-    .padStart(2, "0")}:${(remaining % 60).toString().padStart(2, "0")}`
+  const [minutes, setMinutes] = useState<number | null>(30)
+  const [breaks, setBreaks] = useState(true)
+  const timing = getSessionTiming(state.session, now)
+  const active = timing && !timing.finished
+  const breakCount = minutes && breaks ? Math.floor((minutes - 1) / 30) : 0
+  const label = timing?.paused
+    ? "En pausa"
+    : timing?.finished
+      ? "Finalizada"
+      : timing?.resting
+        ? "Descanso"
+        : active
+          ? "Concentración"
+          : "Prepara tu sesión"
   return (
-    <section className="session-panel" aria-labelledby="session-title">
+    <section
+      className="session-panel"
+      data-phase={timing?.resting ? "break" : "focus"}
+      aria-labelledby="session-title">
       <div className="row">
         <h2 id="session-title">Sesión de estudio</h2>
-        <span className="session-label">
-          {active ? "En curso" : session ? "Finalizada" : "Elige tu tiempo"}
+        <span className="session-label" role="status">
+          {label}
         </span>
       </div>
-      {session && (
+      {timing && (
         <>
-          <div className="row clock-row">
-            <strong
-              className="clock"
-              aria-label={`${Math.floor(remaining / 60)} minutos y ${remaining % 60} segundos restantes`}>
-              {clock}
-            </strong>
-            <small>{active ? "restantes" : "Sesión terminada"}</small>
+          <div className="clock-row row">
+            {active && !timing.paused ? (
+              <Statistic.Timer
+                key={timing.nextBoundary}
+                className="session-clock"
+                type="countdown"
+                value={timing.nextBoundary}
+                format="HH:mm:ss"
+                title={
+                  timing.resting
+                    ? "Descanso restante"
+                    : "Concentración restante"
+                }
+              />
+            ) : (
+              <Statistic
+                className="session-clock"
+                title={timing.paused ? "Tiempo detenido" : "Sesión terminada"}
+                value={timing.remaining}
+                formatter={() =>
+                  new Date(timing.remaining).toISOString().slice(11, 19)
+                }
+              />
+            )}
           </div>
           <progress
-            aria-label="Tiempo transcurrido"
-            max={session.endsAt - session.startedAt}
-            value={Math.min(
-              session.endsAt - session.startedAt,
-              Math.max(0, now - session.startedAt)
-            )}
+            aria-label="Progreso de la sesión completa"
+            max={timing.duration}
+            value={timing.elapsed}
           />
         </>
       )}
       {active ? (
-        <div className="row">
-          <small>
-            {state.enabled
-              ? "Tus filtros están activos."
-              : "Filtrado pausado. El reloj continúa."}
+        <>
+          <div className="row session-actions">
+            <Button
+              type="primary"
+              onClick={() => save(() => setStudySessionPaused(!timing.paused))}>
+              {timing.paused ? "Reanudar sesión" : "Pausar sesión"}
+            </Button>
+            <Button onClick={() => save(endStudySession)}>Finalizar</Button>
+          </div>
+          <small className="session-help">
+            {timing.paused
+              ? "Reloj y filtrado detenidos hasta que reanudes."
+              : timing.resting
+                ? "Descanso de 5 minutos. El filtrado se reanudará al terminar."
+                : state.enabled
+                  ? "Tus filtros están activos durante la concentración."
+                  : "Filtrado desactivado. El reloj sigue contando."}
           </small>
-          <button onClick={() => save(endStudySession)}>
-            Finalizar sesión
-          </button>
-        </div>
+          {state.session?.breaks && !timing.resting && (
+            <small>
+              Descanso de 5 min tras cada 30 min si queda concentración.
+            </small>
+          )}
+        </>
       ) : (
         <form
           onSubmit={(e) => {
             e.preventDefault()
-            save(() => startStudySession(Number(minutes)))
+            save(() => startStudySession(minutes ?? 0, breaks))
           }}>
-          <label htmlFor="session-minutes">Duración en minutos</label>
-          <div className="row">
-            <input
+          <label htmlFor="session-minutes">Minutos de concentración</label>
+          <div className="duration-picker">
+            <Button
+              aria-label="Restar 5 minutos"
+              disabled={minutes === null || minutes <= 5}
+              onClick={() => setMinutes(Math.max(5, (minutes ?? 30) - 5))}>
+              −
+            </Button>
+            <InputNumber
               id="session-minutes"
-              type="number"
-              min="1"
-              max="240"
-              step="1"
-              required
+              min={5}
+              max={240}
+              step={5}
+              precision={0}
+              controls={false}
               value={minutes}
-              onChange={(e) => setMinutes(e.target.value)}
+              onChange={setMinutes}
+              suffix="min"
+              aria-label="Minutos de concentración"
             />
-            <button className="primary">Comenzar sesión</button>
+            <Button
+              aria-label="Sumar 5 minutos"
+              disabled={minutes !== null && minutes >= 240}
+              onClick={() => setMinutes(Math.min(240, (minutes ?? 30) + 5))}>
+              +
+            </Button>
           </div>
+          <Checkbox
+            checked={breaks}
+            onChange={(e) => setBreaks(e.target.checked)}>
+            Descansos de 5 min cada 30 min
+          </Checkbox>
+          <p className="duration-summary">
+            {breakCount
+              ? `${minutes} min de concentración + ${breakCount * 5} min de descanso`
+              : "Concentración continua durante el tiempo elegido."}
+          </p>
+          <Button
+            block
+            type="primary"
+            htmlType="submit"
+            disabled={minutes === null || minutes < 5 || minutes > 240}>
+            Comenzar sesión
+          </Button>
         </form>
       )}
-      {session && !active && (
+      {timing?.finished && (
         <button onClick={() => save(useUntimedFiltering)}>
           Activar filtros sin temporizador
         </button>
       )}
-      {!session && (
-        <small>
-          Al terminar el tiempo, se detiene el filtrado de la sesión.
-        </small>
-      )}
+      {!active && <small>Al finalizar la sesión se detiene el filtrado.</small>}
     </section>
   )
 }

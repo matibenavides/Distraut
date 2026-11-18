@@ -46,7 +46,13 @@ function parseStoredState(stored: unknown): StoredState {
       !Number.isFinite(session.startedAt) ||
       !Number.isFinite(session.endsAt) ||
       session.endsAt <= session.startedAt ||
-      session.endsAt - session.startedAt > 240 * 60000
+      session.endsAt - session.startedAt >
+        (session.breaks ? 275 : 240) * 60000 ||
+      (session.breaks !== undefined && typeof session.breaks !== "boolean") ||
+      (session.pausedAt !== undefined &&
+        (!Number.isFinite(session.pausedAt) ||
+          session.pausedAt < session.startedAt ||
+          session.pausedAt >= session.endsAt))
     )
       throw new Error("La sesión guardada tiene un formato no compatible.")
   }
@@ -179,7 +185,7 @@ export async function setFilteringEnabled(
   return updateState((state) => ({ ...state, enabled }))
 }
 
-export function startStudySession(minutes: number) {
+export function startStudySession(minutes: number, breaks = false) {
   if (!Number.isInteger(minutes) || minutes < 1 || minutes > 240)
     return Promise.reject(new Error("Elige una duración de 1 a 240 minutos."))
   return updateState((state) => {
@@ -187,7 +193,39 @@ export function startStudySession(minutes: number) {
     return {
       ...state,
       enabled: true,
-      session: { startedAt, endsAt: startedAt + minutes * 60000 }
+      session: {
+        startedAt,
+        endsAt:
+          startedAt +
+          (minutes + (breaks ? Math.floor((minutes - 1) / 30) * 5 : 0)) * 60000,
+        breaks
+      }
+    }
+  })
+}
+
+export function setStudySessionPaused(paused: boolean) {
+  return updateState((state) => {
+    const session = state.session
+    const now = Date.now()
+    if (!session || (session.pausedAt ?? now) >= session.endsAt)
+      throw new Error("No hay una sesión en curso.")
+    if (paused) {
+      return {
+        ...state,
+        session: { ...session, pausedAt: session.pausedAt ?? now }
+      }
+    }
+    if (session.pausedAt === undefined) return state
+    const shift = now - session.pausedAt
+    const { pausedAt, ...running } = session
+    return {
+      ...state,
+      session: {
+        ...running,
+        startedAt: session.startedAt + shift,
+        endsAt: session.endsAt + shift
+      }
     }
   })
 }

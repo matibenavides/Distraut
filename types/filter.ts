@@ -19,7 +19,12 @@ export interface StoredState {
   enabled: boolean
   filters: Filter[]
   collections?: FilterCollection[]
-  session?: { startedAt: number; endsAt: number }
+  session?: {
+    startedAt: number
+    endsAt: number
+    pausedAt?: number
+    breaks?: boolean
+  }
 }
 
 export interface VideoMetadata {

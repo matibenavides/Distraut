@@ -1,6 +1,7 @@
 import { ConfigProvider, Switch } from "antd"
 import { useEffect, useRef, useState } from "react"
 
+import { getSessionTiming } from "../lib/session"
 import {
   addCollection,
   getStoredState,
@@ -37,7 +38,12 @@ function IndexPopup() {
     const timer = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(timer)
   }, [state?.session?.endsAt])
-  const expired = !!state?.session && state.session.endsAt <= now
+  const timing = getSessionTiming(state?.session, now)
+  const expired = !!timing?.finished
+  const inCollection =
+    view === "rules"
+      ? state?.collections?.find((group) => group.id === origin)
+      : undefined
   const heading = useRef<HTMLHeadingElement>(null)
 
   useEffect(() => {
@@ -151,7 +157,7 @@ function IndexPopup() {
   }
   return (
     <ConfigProvider theme={popupTheme}>
-      <main className="popup">
+      <main className={`popup ${inCollection ? "popup-collection" : ""}`}>
         {view !== "home" && (
           <button
             className="back"
@@ -162,7 +168,9 @@ function IndexPopup() {
               )
               setError("")
             }}>
-            ‹ Volver
+            {view === "rules" && fromCollections
+              ? "‹ Volver a colecciones"
+              : "‹ Volver a Distraut"}
           </button>
         )}
         <div className="row">
@@ -170,19 +178,32 @@ function IndexPopup() {
             {view === "home"
               ? "Distraut"
               : view === "rules"
-                ? "Palabras y canales"
+                ? inCollection?.name ?? "Filtros guardados"
                 : "Colecciones"}
           </h1>
           {view === "home" && state && (
-            <span className="status" data-on={state.enabled && !expired}>
-              {expired
-                ? "Sesión finalizada"
-                : state.enabled
-                  ? "Filtrado activo"
-                  : "Filtrado en pausa"}
+            <span
+              className="status"
+              data-on={
+                state.enabled && !expired && !timing?.paused && !timing?.resting
+              }>
+              {timing?.paused
+                ? "Sesión en pausa"
+                : timing?.resting
+                  ? "Descanso"
+                  : expired
+                    ? "Sesión finalizada"
+                    : state.enabled
+                      ? "Filtrado activo"
+                      : "Filtrado en pausa"}
             </span>
           )}
         </div>
+        {inCollection && (
+          <p className="collection-context">
+            Estás editando la colección <strong>{inCollection.name}</strong>
+          </p>
+        )}
         {error && (
           <p role="alert" className="error">
             {error}
@@ -202,7 +223,9 @@ function IndexPopup() {
               <>
                 <StudySession state={state} save={save} now={now} />
                 <div className="filter-control row">
-                  <label htmlFor="filtering">Activar filtrado en YouTube</label>
+                  <label htmlFor="filtering">
+                    Habilitar filtros de YouTube
+                  </label>
                   <Switch
                     id="filtering"
                     checked={state.enabled && !expired}
@@ -216,6 +239,12 @@ function IndexPopup() {
                     }
                   />
                 </div>
+                {(timing?.paused || timing?.resting) && (
+                  <small>
+                    La sesión reactivará los filtros habilitados al volver a
+                    concentración.
+                  </small>
+                )}
                 <section>
                   <AddFilter state={state} save={save} />
                 </section>
@@ -272,7 +301,12 @@ function IndexPopup() {
               </>
             )}
             {view === "rules" && (
-              <RuleLibrary state={state} initialOrigin={origin} save={save} />
+              <RuleLibrary
+                key={inCollection?.id ?? "all"}
+                state={state}
+                initialOrigin={inCollection?.id ?? ""}
+                save={save}
+              />
             )}
           </fieldset>
         )}

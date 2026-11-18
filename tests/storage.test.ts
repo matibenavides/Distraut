@@ -12,6 +12,7 @@ import {
   setCollectionEnabled,
   setFilterEnabled,
   setFilteringEnabled,
+  setStudySessionPaused,
   startStudySession,
   subscribeToStoredState,
   useUntimedFiltering
@@ -25,6 +26,37 @@ type Listener = (
   area: string
 ) => void
 let listeners: Set<Listener>
+
+test("pausa y reanudación persisten sin consumir tiempo ni perder el descanso", async () => {
+  await assert.rejects(setStudySessionPaused(true), /sesión en curso/)
+  await startStudySession(60, true)
+  const session = (await getStoredState()).session!
+  assert.equal(session.endsAt - session.startedAt, 65 * 60000)
+  const paused = (await setStudySessionPaused(true)).session!
+  assert.equal(
+    (await setStudySessionPaused(true)).session!.pausedAt,
+    paused.pausedAt
+  )
+  const originalNow = Date.now
+  try {
+    Date.now = () => paused.pausedAt! + 10 * 60000
+    const resumed = (await setStudySessionPaused(false)).session!
+    assert.equal(resumed.endsAt - session.endsAt, 10 * 60000)
+    assert.equal(resumed.startedAt - session.startedAt, 10 * 60000)
+    assert.equal(resumed.pausedAt, undefined)
+    assert.equal(resumed.breaks, true)
+    assert.deepEqual((await setStudySessionPaused(false)).session, resumed)
+  } finally {
+    Date.now = originalNow
+  }
+  values.distrautState = {
+    schemaVersion: 1,
+    enabled: true,
+    filters: [],
+    session: { ...session, pausedAt: session.endsAt }
+  }
+  await assert.rejects(getStoredState(), /sesión guardada/)
+})
 
 test("el reloj persiste, vence y se puede finalizar sin borrar filtros", async () => {
   await addFilter("keyword", "React")
