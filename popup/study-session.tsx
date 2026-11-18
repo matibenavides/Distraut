@@ -130,7 +130,7 @@ export function StudySession({
               suffix="min"
               aria-label="Minutos de concentración"
             />
-            <Button
+            <Button style={{ paddingBottom: "4px" }}
               aria-label="Sumar 5 minutos"
               disabled={minutes !== null && minutes >= 240}
               onClick={() => setMinutes(Math.min(240, (minutes ?? 30) + 5))}>
