@@ -45,6 +45,18 @@ function IndexPopup() {
       ? state?.collections?.find((group) => group.id === origin)
       : undefined
   const heading = useRef<HTMLHeadingElement>(null)
+  const focusedBeforeSave = useRef<HTMLElement | null>(null)
+
+  useEffect(() => {
+    if (!busy && document.activeElement === document.body) {
+      const previous = focusedBeforeSave.current
+      if (previous) {
+        const target = previous.isConnected ? previous : heading.current
+        target?.focus()
+        focusedBeforeSave.current = null
+      }
+    }
+  }, [busy])
 
   useEffect(() => {
     let current = true
@@ -85,6 +97,10 @@ function IndexPopup() {
   }, [view])
 
   const save: Save = async (operation) => {
+    focusedBeforeSave.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null
     setBusy(true)
     setError("")
     try {
