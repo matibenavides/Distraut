@@ -9,6 +9,9 @@ import {
 } from "../lib/statistics"
 import type { StoredState } from "../types/filter"
 
+const progressLimit = 5 * 60 * 60000
+const studyReference = 3 * 60 * 60000
+
 export function StatisticsPanel({
   state,
   error,
@@ -37,10 +40,6 @@ export function StatisticsPanel({
   const study = (day: string) => stats.studyByDay[day] ?? 0
   const totalPlayback = days.reduce((sum, day) => sum + playback(day), 0)
   const totalStudy = days.reduce((sum, day) => sum + study(day), 0)
-  const scale = Math.max(
-    60000,
-    ...days.flatMap((day) => [playback(day), study(day)])
-  )
   const dateLabel = (day: string) =>
     new Date(day + "T12:00:00").toLocaleDateString("es-CL", {
       day: "numeric",
@@ -133,15 +132,41 @@ export function StatisticsPanel({
                         className="weekly-progress"
                         type="line"
                         size={[112, 10]}
-                        percent={(metric.value / scale) * 100}
+                        percent={Math.min(
+                          100,
+                          (metric.value / progressLimit) * 100
+                        )}
                         showInfo={false}
                         status="normal"
                         strokeColor={metric.color}
                         railColor="#eee9f4"
                         aria-label={
-                          metric.label + ": " + formatTime(metric.value)
+                          metric.label +
+                          ": " +
+                          formatTime(metric.value) +
+                          " de " +
+                          formatTime(progressLimit) +
+                          " de escala diaria" +
+                          (metric.label === "Concentración"
+                            ? ", referencia a las 3 horas"
+                            : "")
                         }
                       />
+                      {metric.label === "Concentración" &&
+                        metric.value >= studyReference && (
+                          <span
+                            className="study-reference-marker"
+                            style={{
+                              bottom: `${(studyReference / progressLimit) * 100}%`
+                            }}
+                            aria-hidden="true"
+                          />
+                        )}
+                      {metric.value > progressLimit && (
+                        <span className="progress-overflow" aria-hidden="true">
+                          +
+                        </span>
+                      )}
                     </span>
                   ))}
                 </span>
@@ -155,8 +180,8 @@ export function StatisticsPanel({
           ))}
         </div>
         <small className="chart-scale">
-          Escala común: {formatTime(scale)}. Selecciona un día para ver el
-          detalle.
+          Escala común: 5 h por día. La marca violeta aparece al alcanzar 3 h de
+          concentración. El signo + indica tiempo por encima de la escala.
         </small>
         {!totalPlayback && !totalStudy && (
           <p className="week-empty" role="status">
@@ -183,10 +208,20 @@ export function StatisticsPanel({
           <div>
             <span>YouTube</span>
             <strong>{formatTime(playback(focus))}</strong>
+            {playback(focus) > progressLimit && (
+              <small className="daily-excess">
+                +{formatTime(playback(focus) - progressLimit)} sobre la escala
+              </small>
+            )}
           </div>
           <div>
             <span>Concentración</span>
             <strong>{formatTime(study(focus))}</strong>
+            {study(focus) > progressLimit && (
+              <small className="daily-excess">
+                +{formatTime(study(focus) - progressLimit)} sobre la escala
+              </small>
+            )}
           </div>
         </div>
       </div>

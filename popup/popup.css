@@ -131,6 +131,28 @@ body {
   margin: 0;
   padding: 0;
 }
+.study-reference-marker {
+  position: absolute;
+  left: -3px;
+  width: 16px;
+  border-top: 2px solid #49307f;
+  z-index: 1;
+  pointer-events: none;
+}
+.progress-overflow {
+  position: absolute;
+  top: -16px;
+  left: 0;
+  width: 10px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+.daily-excess {
+  color: #6141b8;
+  font-size: 11px;
+  margin-top: 4px;
+}
 .day-name {
   font-size: 11px;
   font-weight: 600;
