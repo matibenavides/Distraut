@@ -5,6 +5,7 @@ import type {
   StoredState
 } from "../types/filter"
 import { createFilter, normalizeFilterValue } from "./filters"
+import { settleStudyTime } from "./statistics"
 
 const STORAGE_KEY = "distrautState"
 
@@ -39,6 +40,26 @@ function parseStoredState(stored: unknown): StoredState {
   }
 
   const state = stored as StoredState
+  if (state.statistics !== undefined) {
+    const stats = state.statistics
+    const count = (n: unknown) =>
+      typeof n === "number" && Number.isSafeInteger(n) && n >= 0
+    if (
+      !stats ||
+      typeof stats !== "object" ||
+      !count(stats.videos) ||
+      !count(stats.shorts) ||
+      !stats.studyByDay ||
+      typeof stats.studyByDay !== "object" ||
+      Array.isArray(stats.studyByDay) ||
+      !Object.entries(stats.studyByDay).every(
+        ([day, duration]) => /^\d{4}-\d{2}-\d{2}$/.test(day) && count(duration)
+      )
+    )
+      throw new Error(
+        "Las estadísticas guardadas tienen un formato no compatible."
+      )
+  }
   if (state.session !== undefined) {
     const session = state.session
     if (
@@ -46,6 +67,10 @@ function parseStoredState(stored: unknown): StoredState {
       session === null ||
       !Number.isFinite(session.startedAt) ||
       !Number.isFinite(session.endsAt) ||
+      (session.accountedThrough !== undefined &&
+        (!Number.isFinite(session.accountedThrough) ||
+          session.accountedThrough < session.startedAt ||
+          session.accountedThrough > session.endsAt)) ||
       session.endsAt <= session.startedAt ||
       session.endsAt - session.startedAt >
         (session.breaks ? 275 : 240) * 60000 ||
@@ -128,7 +153,7 @@ function updateState(
   change: (state: StoredState) => StoredState
 ): Promise<StoredState> {
   return navigator.locks.request(STORAGE_KEY, async () => {
-    const state = change(await getStoredState())
+    const state = change(settleStudyTime(await getStoredState()))
     await chrome.storage.local.set({ [STORAGE_KEY]: state })
     return state
   })
@@ -190,6 +215,31 @@ export function setShortsHidden(hideShorts: boolean): Promise<StoredState> {
   return updateState((state) => ({ ...state, hideShorts }))
 }
 
+export function recordHiddenCounts(videos: number, shorts: number) {
+  if (![videos, shorts].every((n) => Number.isSafeInteger(n) && n >= 0))
+    return Promise.reject(new Error("Recuento de ocultaciones inválido."))
+  return updateState((state) => {
+    const statistics = state.statistics ?? {
+      videos: 0,
+      shorts: 0,
+      studyByDay: {}
+    }
+    if (
+      !Number.isSafeInteger(statistics.videos + videos) ||
+      !Number.isSafeInteger(statistics.shorts + shorts)
+    )
+      throw new Error("Se alcanzó el límite del contador.")
+    return {
+      ...state,
+      statistics: {
+        ...statistics,
+        videos: statistics.videos + videos,
+        shorts: statistics.shorts + shorts
+      }
+    }
+  })
+}
+
 export function startStudySession(minutes: number, breaks = false) {
   if (!Number.isInteger(minutes) || minutes < 1 || minutes > 240)
     return Promise.reject(new Error("Elige una duración de 1 a 240 minutos."))
@@ -228,6 +278,7 @@ export function setStudySessionPaused(paused: boolean) {
       ...state,
       session: {
         ...running,
+        accountedThrough: now,
         startedAt: session.startedAt + shift,
         endsAt: session.endsAt + shift
       }

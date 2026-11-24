@@ -1,4 +1,4 @@
-import { ConfigProvider, Switch } from "antd"
+import { ConfigProvider, Switch, Tabs } from "antd"
 import { useEffect, useRef, useState } from "react"
 
 import { getSessionTiming } from "../lib/session"
@@ -15,6 +15,7 @@ import {
 import type { FilterCollection, StoredState } from "../types/filter"
 import { AddFilter } from "./add-filter"
 import { RuleLibrary } from "./rule-library"
+import { StatisticsPanel } from "./statistics"
 import { StudySession } from "./study-session"
 import { popupTheme } from "./theme"
 
@@ -24,6 +25,7 @@ export type Save = (operation: () => Promise<StoredState>) => Promise<boolean>
 
 function IndexPopup() {
   const [state, setState] = useState<StoredState>()
+  const [tab, setTab] = useState("filters")
   const [error, setError] = useState("")
   const [busy, setBusy] = useState(false)
   const [attempt, setAttempt] = useState(0)
@@ -172,174 +174,189 @@ function IndexPopup() {
       </div>
     )
   }
+  const filterPanel = (
+    <>
+      {view !== "home" && (
+        <button
+          className="back"
+          onClick={() => {
+            setDeleting("")
+            setView(
+              view === "rules" && fromCollections ? "collections" : "home"
+            )
+            setError("")
+          }}>
+          {view === "rules" && fromCollections
+            ? "‹ Volver a colecciones"
+            : "‹ Volver a Distraut"}
+        </button>
+      )}
+      <div className="row">
+        <h1 ref={heading} tabIndex={-1}>
+          {view === "home"
+            ? "Distraut"
+            : view === "rules"
+              ? inCollection?.name ?? "Filtros guardados"
+              : "Colecciones"}
+        </h1>
+        {view === "home" && state && (
+          <span
+            className="status"
+            data-on={
+              state.enabled && !expired && !timing?.paused && !timing?.resting
+            }>
+            {timing?.paused
+              ? "Sesión en pausa"
+              : timing?.resting
+                ? "Descanso"
+                : expired
+                  ? "Sesión finalizada"
+                  : state.enabled
+                    ? "Filtrado activo"
+                    : "Filtrado en pausa"}
+          </span>
+        )}
+      </div>
+      {inCollection && (
+        <p className="collection-context">
+          Estás editando la colección <strong>{inCollection.name}</strong>
+        </p>
+      )}
+      {error && (
+        <p role="alert" className="error">
+          {error}
+        </p>
+      )}
+      {!state ? (
+        error ? (
+          <button onClick={() => setAttempt((n) => n + 1)}>
+            Volver a cargar
+          </button>
+        ) : (
+          <p role="status">Cargando reglas…</p>
+        )
+      ) : (
+        <fieldset disabled={busy} aria-busy={busy}>
+          {view === "home" && (
+            <>
+              <StudySession state={state} save={save} now={now} />
+              <div className="filter-control row">
+                <label htmlFor="filtering">Habilitar filtros de YouTube</label>
+                <Switch
+                  id="filtering"
+                  checked={state.enabled && !expired}
+                  disabled={busy}
+                  onChange={(enabled) =>
+                    save(() =>
+                      enabled && expired
+                        ? useUntimedFiltering()
+                        : setFilteringEnabled(enabled)
+                    )
+                  }
+                />
+              </div>
+              {(timing?.paused || timing?.resting) && (
+                <small>
+                  La sesión reactivará los filtros habilitados al volver a
+                  concentración.
+                </small>
+              )}
+              <div className="filter-control row">
+                <label htmlFor="hide-shorts">Ocultar Shorts</label>
+                <Switch
+                  id="hide-shorts"
+                  checked={state.hideShorts ?? false}
+                  disabled={busy}
+                  aria-describedby="shorts-help"
+                  onChange={(hidden) => save(() => setShortsHidden(hidden))}
+                />
+              </div>
+              <small id="shorts-help">
+                Independiente de los filtros y de la sesión de estudio.
+              </small>
+              <section>
+                <AddFilter state={state} save={save} />
+              </section>
+              <section>
+                <div className="row">
+                  <h2>Colecciones</h2>
+                  <button onClick={() => setView("collections")}>
+                    {groups.length
+                      ? `Ver todas (${groups.length})`
+                      : "Crear colección"}
+                  </button>
+                </div>
+                {groups[0] ? (
+                  collectionRow(groups[0])
+                ) : (
+                  <p>Agrupa palabras y canales para pausarlos juntos.</p>
+                )}
+              </section>
+              <section className="row">
+                <div>
+                  <h2>Palabras y canales ocultos</h2>
+                  <p>{state.filters.length} filtros guardados</p>
+                </div>
+                <button className="primary" onClick={() => openRules()}>
+                  Ver y editar ›
+                </button>
+              </section>
+            </>
+          )}
+          {view === "collections" && (
+            <>
+              <form
+                className="create-form"
+                onSubmit={async (e) => {
+                  e.preventDefault()
+                  if (await save(() => addCollection(name))) setName("")
+                }}>
+                <label htmlFor="group-name">Nueva colección</label>
+                <div className="row">
+                  <input
+                    id="group-name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Ej. Juegos"
+                    required
+                  />
+                  <button className="primary">Crear</button>
+                </div>
+              </form>
+              <div className="collection-list">{groups.map(collectionRow)}</div>
+              {!groups.length && <p>Todavía no tienes colecciones.</p>}
+            </>
+          )}
+          {view === "rules" && (
+            <RuleLibrary
+              key={inCollection?.id ?? "all"}
+              state={state}
+              initialOrigin={inCollection?.id ?? ""}
+              save={save}
+            />
+          )}
+        </fieldset>
+      )}
+    </>
+  )
   return (
     <ConfigProvider theme={popupTheme}>
-      <main className={`popup ${inCollection ? "popup-collection" : ""}`}>
-        {view !== "home" && (
-          <button
-            className="back"
-            onClick={() => {
-              setDeleting("")
-              setView(
-                view === "rules" && fromCollections ? "collections" : "home"
+      <main
+        className={`popup ${tab === "filters" && inCollection ? "popup-collection" : ""}`}>
+        <Tabs
+          activeKey={tab}
+          onChange={setTab}
+          items={[
+            { key: "filters", label: "Filtros", children: filterPanel },
+            {
+              key: "statistics",
+              label: "Estadísticas",
+              children: (
+                <StatisticsPanel state={state} error={error} now={now} />
               )
-              setError("")
-            }}>
-            {view === "rules" && fromCollections
-              ? "‹ Volver a colecciones"
-              : "‹ Volver a Distraut"}
-          </button>
-        )}
-        <div className="row">
-          <h1 ref={heading} tabIndex={-1}>
-            {view === "home"
-              ? "Distraut"
-              : view === "rules"
-                ? inCollection?.name ?? "Filtros guardados"
-                : "Colecciones"}
-          </h1>
-          {view === "home" && state && (
-            <span
-              className="status"
-              data-on={
-                state.enabled && !expired && !timing?.paused && !timing?.resting
-              }>
-              {timing?.paused
-                ? "Sesión en pausa"
-                : timing?.resting
-                  ? "Descanso"
-                  : expired
-                    ? "Sesión finalizada"
-                    : state.enabled
-                      ? "Filtrado activo"
-                      : "Filtrado en pausa"}
-            </span>
-          )}
-        </div>
-        {inCollection && (
-          <p className="collection-context">
-            Estás editando la colección <strong>{inCollection.name}</strong>
-          </p>
-        )}
-        {error && (
-          <p role="alert" className="error">
-            {error}
-          </p>
-        )}
-        {!state ? (
-          error ? (
-            <button onClick={() => setAttempt((n) => n + 1)}>
-              Volver a cargar
-            </button>
-          ) : (
-            <p role="status">Cargando reglas…</p>
-          )
-        ) : (
-          <fieldset disabled={busy} aria-busy={busy}>
-            {view === "home" && (
-              <>
-                <StudySession state={state} save={save} now={now} />
-                <div className="filter-control row">
-                  <label htmlFor="filtering">
-                    Habilitar filtros de YouTube
-                  </label>
-                  <Switch
-                    id="filtering"
-                    checked={state.enabled && !expired}
-                    disabled={busy}
-                    onChange={(enabled) =>
-                      save(() =>
-                        enabled && expired
-                          ? useUntimedFiltering()
-                          : setFilteringEnabled(enabled)
-                      )
-                    }
-                  />
-                </div>
-                {(timing?.paused || timing?.resting) && (
-                  <small>
-                    La sesión reactivará los filtros habilitados al volver a
-                    concentración.
-                  </small>
-                )}
-                <div className="filter-control row">
-                  <label htmlFor="hide-shorts">Ocultar Shorts</label>
-                  <Switch
-                    id="hide-shorts"
-                    checked={state.hideShorts ?? false}
-                    disabled={busy}
-                    aria-describedby="shorts-help"
-                    onChange={(hidden) => save(() => setShortsHidden(hidden))}
-                  />
-                </div>
-                <small id="shorts-help">
-                  Independiente de los filtros y de la sesión de estudio.
-                </small>
-                <section>
-                  <AddFilter state={state} save={save} />
-                </section>
-                <section>
-                  <div className="row">
-                    <h2>Colecciones</h2>
-                    <button onClick={() => setView("collections")}>
-                      {groups.length
-                        ? `Ver todas (${groups.length})`
-                        : "Crear colección"}
-                    </button>
-                  </div>
-                  {groups[0] ? (
-                    collectionRow(groups[0])
-                  ) : (
-                    <p>Agrupa palabras y canales para pausarlos juntos.</p>
-                  )}
-                </section>
-                <section className="row">
-                  <div>
-                    <h2>Palabras y canales ocultos</h2>
-                    <p>{state.filters.length} filtros guardados</p>
-                  </div>
-                  <button className="primary" onClick={() => openRules()}>
-                    Ver y editar ›
-                  </button>
-                </section>
-              </>
-            )}
-            {view === "collections" && (
-              <>
-                <form
-                  className="create-form"
-                  onSubmit={async (e) => {
-                    e.preventDefault()
-                    if (await save(() => addCollection(name))) setName("")
-                  }}>
-                  <label htmlFor="group-name">Nueva colección</label>
-                  <div className="row">
-                    <input
-                      id="group-name"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder="Ej. Juegos"
-                      required
-                    />
-                    <button className="primary">Crear</button>
-                  </div>
-                </form>
-                <div className="collection-list">
-                  {groups.map(collectionRow)}
-                </div>
-                {!groups.length && <p>Todavía no tienes colecciones.</p>}
-              </>
-            )}
-            {view === "rules" && (
-              <RuleLibrary
-                key={inCollection?.id ?? "all"}
-                state={state}
-                initialOrigin={inCollection?.id ?? ""}
-                save={save}
-              />
-            )}
-          </fieldset>
-        )}
+            }
+          ]}
+        />
       </main>
     </ConfigProvider>
   )

@@ -24,6 +24,35 @@ const lockup = (title: string, channel: string) => `
 
 const short = `<ytm-shorts-lockup-view-model-v2><ytm-shorts-lockup-view-model><a href="/shorts/abc">Short</a></ytm-shorts-lockup-view-model></ytm-shorts-lockup-view-model-v2>`
 
+test("métrica devuelve tarjetas individuales, sin duplicar enlaces o secciones de Shorts", () => {
+  const { document } = parseHTML(
+    `<ytd-search><grid-shelf-view-model>${short}${short}</grid-shelf-view-model><ytd-video-renderer is-search>${lockup("React", "Canal")}</ytd-video-renderer></ytd-search>`
+  )
+  const state: StoredState = {
+    schemaVersion: 1,
+    enabled: true,
+    hideShorts: true,
+    filters: [{ id: "r", type: "keyword", value: "React", enabled: true }]
+  }
+  assert.deepEqual(
+    applyVideoFilters(document, state).sort((a, b) =>
+      a.kind.localeCompare(b.kind)
+    ),
+    [
+      { kind: "shorts", id: "abc" },
+      { kind: "videos", id: "abc" }
+    ]
+  )
+  assert.deepEqual(
+    applyVideoFilters(document, {
+      ...state,
+      enabled: false,
+      hideShorts: false
+    }),
+    []
+  )
+})
+
 test("Shorts: secciones y tarjetas reversibles sin tocar videos, menú o reproductor", () => {
   const { document } = parseHTML(`
     <nav><a href="/shorts/">Shorts</a></nav>

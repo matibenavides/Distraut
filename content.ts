@@ -1,6 +1,7 @@
 import type { PlasmoCSConfig } from "plasmo"
 
 import { getSessionTiming } from "./lib/session"
+import { createStatisticsRecorder } from "./lib/statistics"
 import { getStoredState, subscribeToStoredState } from "./lib/storage"
 import { applyVideoFilters, observeVideoChanges } from "./lib/youtube-dom"
 import type { StoredState } from "./types/filter"
@@ -13,11 +14,27 @@ export const config: PlasmoCSConfig = {
 let stateChanged = false
 let currentState: StoredState | undefined
 let expiryTimer: ReturnType<typeof setTimeout> | undefined
+const recordHidden = createStatisticsRecorder(async (videos, shorts) => {
+  const result = await chrome.runtime.sendMessage({
+    type: "record-hidden",
+    videos,
+    shorts
+  })
+  if (!result?.ok)
+    throw new Error(result?.error || "No se pudo guardar el recuento.")
+})
+
+function applyFilters(state: StoredState): void {
+  const hidden = applyVideoFilters(document, state)
+  recordHidden(hidden).catch((error) =>
+    console.error("Distraut: no se pudieron guardar las estadísticas.", error)
+  )
+}
 
 function receiveState(state: StoredState): void {
   currentState = state
   clearTimeout(expiryTimer)
-  applyVideoFilters(document, state)
+  applyFilters(state)
   const timing = getSessionTiming(state.session)
   if (timing && !timing.finished && !timing.paused) {
     expiryTimer = setTimeout(
@@ -34,7 +51,7 @@ document.addEventListener("visibilitychange", () => {
 })
 
 observeVideoChanges(document, () => {
-  if (currentState) applyVideoFilters(document, currentState)
+  if (currentState) applyFilters(currentState)
 })
 
 function reportError(error: Error): void {

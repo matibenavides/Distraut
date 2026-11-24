@@ -7,6 +7,7 @@ import {
   addFilter,
   endStudySession,
   getStoredState,
+  recordHiddenCounts,
   removeCollection,
   removeFilter,
   setCollectionEnabled,
@@ -27,6 +28,39 @@ type Listener = (
   area: string
 ) => void
 let listeners: Set<Listener>
+
+test("estadísticas acumulan sin pisar filtros y rechazan datos incompatibles", async () => {
+  await addFilter("keyword", "React")
+  await Promise.all([recordHiddenCounts(2, 1), recordHiddenCounts(3, 4)])
+  const state = await getStoredState()
+  assert.deepEqual(state.statistics, { videos: 5, shorts: 5, studyByDay: {} })
+  assert.equal(state.filters.length, 1)
+  await assert.rejects(recordHiddenCounts(-1, 0), /inválido/)
+  values.distrautState = {
+    ...state,
+    statistics: { videos: -1, shorts: 0, studyByDay: {} }
+  }
+  await assert.rejects(getStoredState(), /estadísticas guardadas/)
+})
+
+test("consolida tiempo al pausar, reanudar y terminar sin contar la pausa", async () => {
+  const realNow = Date.now
+  let clock = new Date(2026, 10, 24, 10).getTime()
+  Date.now = () => clock
+  try {
+    await startStudySession(60, true)
+    clock += 10 * 60000
+    await setStudySessionPaused(true)
+    clock += 20 * 60000
+    await setStudySessionPaused(false)
+    clock += 5 * 60000
+    const ended = await endStudySession()
+    assert.equal(ended.statistics?.studyByDay["2026-11-24"], 15 * 60000)
+    assert.equal(ended.session, undefined)
+  } finally {
+    Date.now = realNow
+  }
+})
 
 test("Shorts persiste independiente de los filtros y de la sesión", async () => {
   await addFilter("keyword", "React")
@@ -123,7 +157,13 @@ test("el reloj persiste, vence y se puede finalizar sin borrar filtros", async (
   }
   assert.equal(shouldHideVideo(ended, { title: "React" }), false)
   await setFilteringEnabled(false)
-  assert.deepEqual((await getStoredState()).session, state.session)
+  const { accountedThrough, ...persistedSession } = (await getStoredState())
+    .session!
+  assert.deepEqual(persistedSession, state.session)
+  assert.ok(
+    accountedThrough === undefined ||
+      accountedThrough >= state.session!.startedAt
+  )
   assert.equal((await endStudySession()).enabled, false)
   const untimed = await useUntimedFiltering()
   assert.equal(untimed.session, undefined)

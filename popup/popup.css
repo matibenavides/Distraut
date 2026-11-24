@@ -19,6 +19,22 @@ body {
   overflow-y: auto;
   scrollbar-gutter: stable;
 }
+.statistics-counts {
+  justify-content: flex-start;
+  gap: 50px;
+  margin: 16px 0;
+}
+.study-days {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0;
+}
+.study-days th,
+.study-days td {
+  text-align: left;
+  padding: 8px 0;
+  border-bottom: 1px solid #e4dfeb;
+}
 fieldset {
   margin: 0;
   padding: 0;

@@ -19,13 +19,26 @@ export interface StoredState {
   enabled: boolean
   filters: Filter[]
   hideShorts?: boolean
+  statistics?: UsageStatistics
   collections?: FilterCollection[]
   session?: {
     startedAt: number
     endsAt: number
     pausedAt?: number
     breaks?: boolean
+    accountedThrough?: number
   }
+}
+
+export interface UsageStatistics {
+  videos: number
+  shorts: number
+  studyByDay: Record<string, number>
+}
+
+export interface HiddenContent {
+  kind: "videos" | "shorts"
+  id: string
 }
 
 export interface VideoMetadata {

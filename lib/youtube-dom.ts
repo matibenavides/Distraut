@@ -1,4 +1,4 @@
-import type { StoredState, VideoMetadata } from "../types/filter"
+import type { HiddenContent, StoredState, VideoMetadata } from "../types/filter"
 import { shouldHideVideo } from "./matching"
 
 const VIDEO_CARD_SELECTOR = [
@@ -42,7 +42,10 @@ export function findVideoCards(root: ParentNode): Element[] {
   return Array.from(root.querySelectorAll(VIDEO_CARD_SELECTOR))
 }
 
-export function applyVideoFilters(root: ParentNode, state: StoredState): void {
+export function applyVideoFilters(
+  root: ParentNode,
+  state: StoredState
+): HiddenContent[] {
   for (const card of findVideoCards(root)) {
     const isVideo = Boolean(card.querySelector('a[href^="/watch?v="]'))
     card.classList.toggle(
@@ -61,6 +64,17 @@ export function applyVideoFilters(root: ParentNode, state: StoredState): void {
       )
     )
   }
+  const hidden = new Map<string, HiddenContent>()
+  for (const link of root.querySelectorAll(
+    '.distraut-hidden a[href^="/watch?v="], .distraut-shorts-hidden a[href^="/shorts/"]'
+  )) {
+    const url = new URL(link.getAttribute("href")!, "https://www.youtube.com")
+    const kind = url.pathname === "/watch" ? "videos" : "shorts"
+    const id =
+      kind === "videos" ? url.searchParams.get("v") : url.pathname.split("/")[2]
+    if (id) hidden.set(`${kind}:${id}`, { kind, id })
+  }
+  return [...hidden.values()]
 }
 
 export function observeVideoChanges(
