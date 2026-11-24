@@ -41,9 +41,11 @@ function reportError(error: Error): void {
   currentState = undefined
   clearTimeout(expiryTimer)
   console.error("Distraut: no se pudieron leer los filtros.", error)
-  document.querySelectorAll(".distraut-hidden").forEach((card) => {
-    card.classList.remove("distraut-hidden")
-  })
+  document
+    .querySelectorAll(".distraut-hidden, .distraut-shorts-hidden")
+    .forEach((card) => {
+      card.classList.remove("distraut-hidden", "distraut-shorts-hidden")
+    })
 }
 
 subscribeToStoredState(

@@ -22,6 +22,120 @@ const lockup = (title: string, channel: string) => `
   </yt-lockup-view-model>
 `
 
+const short = `<ytm-shorts-lockup-view-model-v2><ytm-shorts-lockup-view-model><a href="/shorts/abc">Short</a></ytm-shorts-lockup-view-model></ytm-shorts-lockup-view-model-v2>`
+
+test("Shorts: secciones y tarjetas reversibles sin tocar videos, menú o reproductor", () => {
+  const { document } = parseHTML(`
+    <nav><a href="/shorts/">Shorts</a></nav>
+    <ytd-rich-grid-renderer>
+      <ytd-rich-section-renderer id="home"><ytd-rich-shelf-renderer is-shorts>${short}</ytd-rich-shelf-renderer></ytd-rich-section-renderer>
+      <ytd-rich-item-renderer lockup id="normal">${lockup("React", "Canal")}</ytd-rich-item-renderer>
+    </ytd-rich-grid-renderer>
+    <ytd-search>
+      <grid-shelf-view-model id="search">${short}</grid-shelf-view-model>
+      <grid-shelf-view-model id="mixed">${short}${lockup("Python", "Canal")}</grid-shelf-view-model>
+      <ytd-video-renderer is-search id="single"><a href="/shorts/xyz">Solo short</a></ytd-video-renderer>
+    </ytd-search>
+    <ytd-watch-next-secondary-results-renderer><ytd-reel-shelf-renderer id="related"><ytd-reel-item-renderer><a href="/shorts/def">Short</a></ytd-reel-item-renderer></ytd-reel-shelf-renderer></ytd-watch-next-secondary-results-renderer>
+    <ytd-shorts id="player">${short}</ytd-shorts>
+  `)
+  const state: StoredState = {
+    schemaVersion: 1,
+    enabled: false,
+    filters: [],
+    hideShorts: true
+  }
+  const nodes = ["home", "search", "single", "related"].map(
+    (id) => document.getElementById(id)!
+  )
+  applyVideoFilters(document, { ...state, hideShorts: undefined })
+  assert.equal(document.querySelectorAll(".distraut-shorts-hidden").length, 0)
+  applyVideoFilters(document, state)
+  for (const node of nodes)
+    assert.equal(node.classList.contains("distraut-shorts-hidden"), true)
+  for (const id of ["normal", "mixed", "player"]) {
+    assert.equal(
+      document.getElementById(id)!.classList.contains("distraut-shorts-hidden"),
+      false
+    )
+  }
+  assert.equal(document.querySelector("#player .distraut-shorts-hidden"), null)
+  assert.equal(
+    document
+      .querySelector("#mixed ytm-shorts-lockup-view-model-v2")!
+      .classList.contains("distraut-shorts-hidden"),
+    true
+  )
+  assert.equal(document.querySelector("nav .distraut-shorts-hidden"), null)
+  applyVideoFilters(document, {
+    ...state,
+    hideShorts: false,
+    enabled: true,
+    filters: [{ id: "1", type: "keyword", value: "React", enabled: true }]
+  })
+  assert.equal(document.querySelectorAll(".distraut-shorts-hidden").length, 0)
+  assert.equal(
+    document.getElementById("normal")!.classList.contains("distraut-hidden"),
+    true
+  )
+  for (const node of nodes) assert.equal(document.contains(node), true)
+})
+
+test("Shorts sigue oculto durante pausa, descanso y vencimiento de la sesión", () => {
+  const { document } = parseHTML(`<ytd-search>${short}</ytd-search>`)
+  const now = Date.now()
+  for (const session of [
+    { startedAt: now - 1000, endsAt: now + 10000, pausedAt: now },
+    { startedAt: now - 31 * 60000, endsAt: now + 34 * 60000, breaks: true },
+    { startedAt: now - 10000, endsAt: now - 1 }
+  ]) {
+    applyVideoFilters(document, {
+      schemaVersion: 1,
+      enabled: true,
+      filters: [],
+      hideShorts: true,
+      session
+    })
+    assert.equal(
+      document
+        .querySelector("ytm-shorts-lockup-view-model-v2")!
+        .classList.contains("distraut-shorts-hidden"),
+      true
+    )
+  }
+})
+
+test("Shorts: observa nuevas tarjetas, cambios de enlace y reutilización de secciones", async () => {
+  const { document, window } = parseHTML(
+    `<ytd-search><grid-shelf-view-model></grid-shelf-view-model></ytd-search>`
+  )
+  const state: StoredState = {
+    schemaVersion: 1,
+    enabled: false,
+    filters: [],
+    hideShorts: true
+  }
+  let runs = 0
+  const stop = observeVideoChanges(document, () => {
+    runs++
+    applyVideoFilters(document, state)
+  })
+  const shelf = document.querySelector("grid-shelf-view-model")!
+  shelf.insertAdjacentHTML("beforeend", short)
+  await new Promise((resolve) => setTimeout(resolve, 15))
+  assert.equal(shelf.classList.contains("distraut-shorts-hidden"), true)
+  assert.equal(runs, 1)
+  shelf.querySelector("a")!.setAttribute("href", "/watch?v=abc")
+  await new Promise((resolve) => setTimeout(resolve, 15))
+  assert.equal(document.querySelectorAll(".distraut-shorts-hidden").length, 0)
+  shelf.querySelector("a")!.setAttribute("href", "/shorts/abc")
+  document.dispatchEvent(new window.Event("yt-navigate-finish"))
+  await new Promise((resolve) => setTimeout(resolve, 15))
+  assert.equal(shelf.classList.contains("distraut-shorts-hidden"), true)
+  assert.equal(runs, 3)
+  stop()
+})
+
 test("inicio: extrae título y canal del video, sin incluir Shorts", () => {
   const { document } = parseHTML(`
     <ytd-rich-grid-renderer>

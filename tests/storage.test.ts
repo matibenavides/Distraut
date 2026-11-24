@@ -12,6 +12,7 @@ import {
   setCollectionEnabled,
   setFilterEnabled,
   setFilteringEnabled,
+  setShortsHidden,
   setStudySessionPaused,
   startStudySession,
   subscribeToStoredState,
@@ -26,6 +27,55 @@ type Listener = (
   area: string
 ) => void
 let listeners: Set<Listener>
+
+test("Shorts persiste independiente de los filtros y de la sesión", async () => {
+  await addFilter("keyword", "React")
+  assert.equal((await getStoredState()).hideShorts, undefined)
+  const changes: StoredState[] = []
+  const stop = subscribeToStoredState(
+    (state) => changes.push(state),
+    assert.fail
+  )
+  await setShortsHidden(true)
+  assert.equal(changes.at(-1)?.hideShorts, true)
+  await setFilteringEnabled(false)
+  assert.equal((await getStoredState()).hideShorts, true)
+  await startStudySession(30)
+  await setStudySessionPaused(true)
+  assert.equal((await getStoredState()).hideShorts, true)
+  await endStudySession()
+  const before = await getStoredState()
+  assert.equal(before.hideShorts, true)
+  await setShortsHidden(false)
+  assert.deepEqual(await getStoredState(), { ...before, hideShorts: false })
+  failWrite = true
+  await assert.rejects(setShortsHidden(true), /No se pudo guardar/)
+  assert.equal((await getStoredState()).hideShorts, false)
+  stop()
+})
+
+test("rechaza hideShorts incompatible en lectura y eventos sin sobrescribir", async () => {
+  const invalid = {
+    schemaVersion: 1,
+    enabled: true,
+    filters: [],
+    hideShorts: "sí"
+  }
+  values.distrautState = invalid
+  await assert.rejects(getStoredState(), /formato no compatible/)
+  await assert.rejects(setShortsHidden(false), /formato no compatible/)
+  assert.equal(values.distrautState, invalid)
+  const errors: Error[] = []
+  const stop = subscribeToStoredState(
+    () => assert.fail("No debe emitir un estado incompatible"),
+    (error) => errors.push(error)
+  )
+  for (const listener of listeners) {
+    listener({ distrautState: { newValue: invalid } }, "local")
+  }
+  assert.equal(errors.length, 1)
+  stop()
+})
 
 test("pausa y reanudación persisten sin consumir tiempo ni perder el descanso", async () => {
   await assert.rejects(setStudySessionPaused(true), /sesión en curso/)

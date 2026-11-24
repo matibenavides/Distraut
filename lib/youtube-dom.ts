@@ -8,6 +8,18 @@ const VIDEO_CARD_SELECTOR = [
 ].join(", ")
 const VIDEO_SURFACE_SELECTOR =
   "ytd-rich-grid-renderer, ytd-search, ytd-watch-next-secondary-results-renderer"
+const SHORTS_CONTAINER_SELECTOR = [
+  "ytd-rich-section-renderer",
+  "ytd-rich-shelf-renderer",
+  "ytd-reel-shelf-renderer",
+  "grid-shelf-view-model",
+  "ytd-rich-item-renderer",
+  "ytd-reel-item-renderer",
+  "ytm-shorts-lockup-view-model-v2",
+  "ytm-shorts-lockup-view-model",
+  VIDEO_CARD_SELECTOR,
+  ".distraut-shorts-hidden"
+].join(", ")
 
 export function readVideoMetadata(card: Element): VideoMetadata {
   const titleElement = card.querySelector(
@@ -36,6 +48,17 @@ export function applyVideoFilters(root: ParentNode, state: StoredState): void {
     card.classList.toggle(
       "distraut-hidden",
       isVideo && shouldHideVideo(state, readVideoMetadata(card))
+    )
+  }
+  for (const card of root.querySelectorAll(SHORTS_CONTAINER_SELECTOR)) {
+    card.classList.toggle(
+      "distraut-shorts-hidden",
+      Boolean(
+        state.hideShorts &&
+          card.closest(VIDEO_SURFACE_SELECTOR) &&
+          card.querySelector('a[href^="/shorts/"]') &&
+          !card.querySelector('a[href^="/watch?"]')
+      )
     )
   }
 }
@@ -67,6 +90,7 @@ export function observeVideoChanges(
           if (node.nodeType !== 1) return false
           const element = node as Element
           return (
+            Boolean(element.closest(VIDEO_SURFACE_SELECTOR)) ||
             element.matches(VIDEO_SURFACE_SELECTOR) ||
             element.matches(VIDEO_CARD_SELECTOR) ||
             Boolean(element.querySelector(VIDEO_SURFACE_SELECTOR)) ||

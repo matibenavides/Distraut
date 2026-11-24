@@ -8,6 +8,7 @@ import {
   removeCollection,
   setCollectionEnabled,
   setFilteringEnabled,
+  setShortsHidden,
   subscribeToStoredState,
   useUntimedFiltering
 } from "../lib/storage"
@@ -261,6 +262,19 @@ function IndexPopup() {
                     concentración.
                   </small>
                 )}
+                <div className="filter-control row">
+                  <label htmlFor="hide-shorts">Ocultar Shorts</label>
+                  <Switch
+                    id="hide-shorts"
+                    checked={state.hideShorts ?? false}
+                    disabled={busy}
+                    aria-describedby="shorts-help"
+                    onChange={(hidden) => save(() => setShortsHidden(hidden))}
+                  />
+                </div>
+                <small id="shorts-help">
+                  Independiente de los filtros y de la sesión de estudio.
+                </small>
                 <section>
                   <AddFilter state={state} save={save} />
                 </section>

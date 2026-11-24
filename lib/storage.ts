@@ -27,6 +27,7 @@ function parseStoredState(stored: unknown): StoredState {
     stored.schemaVersion !== 1 ||
     !("enabled" in stored) ||
     typeof stored.enabled !== "boolean" ||
+    ("hideShorts" in stored && typeof stored.hideShorts !== "boolean") ||
     !("filters" in stored) ||
     !Array.isArray(stored.filters) ||
     !stored.filters.every(isFilter) ||
@@ -183,6 +184,10 @@ export async function setFilteringEnabled(
   enabled: boolean
 ): Promise<StoredState> {
   return updateState((state) => ({ ...state, enabled }))
+}
+
+export function setShortsHidden(hideShorts: boolean): Promise<StoredState> {
+  return updateState((state) => ({ ...state, hideShorts }))
 }
 
 export function startStudySession(minutes: number, breaks = false) {

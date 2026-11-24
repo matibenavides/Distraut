@@ -18,6 +18,7 @@ export interface StoredState {
   schemaVersion: 1
   enabled: boolean
   filters: Filter[]
+  hideShorts?: boolean
   collections?: FilterCollection[]
   session?: {
     startedAt: number
