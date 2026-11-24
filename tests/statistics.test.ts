@@ -1,8 +1,45 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { createStatisticsRecorder, settleStudyTime } from "../lib/statistics"
+import {
+  addPlaybackInterval,
+  createStatisticsRecorder,
+  settleStudyTime,
+  weekDays
+} from "../lib/statistics"
 import type { StoredState } from "../types/filter"
+
+test("reproducción cruza medianoche y se conserva al consolidar concentración", () => {
+  const start = new Date(2026, 10, 24, 23, 59).getTime()
+  const days = addPlaybackInterval({}, start, start + 120000)
+  assert.deepEqual(days, { "2026-11-24": 60000, "2026-11-25": 60000 })
+  const state: StoredState = {
+    schemaVersion: 1,
+    enabled: true,
+    filters: [],
+    statistics: { videos: 0, shorts: 0, studyByDay: {}, playbackByDay: days },
+    session: { startedAt: start, endsAt: start + 120000 }
+  }
+  assert.deepEqual(
+    settleStudyTime(state, start + 120000).statistics?.playbackByDay,
+    days
+  )
+})
+
+test("semana empieza lunes y acaba domingo, incluidos cambios de año y domingo", () => {
+  const sunday = new Date(2027, 0, 3, 23, 30).getTime()
+  assert.deepEqual(weekDays(sunday), [
+    "2026-12-28",
+    "2026-12-29",
+    "2026-12-30",
+    "2026-12-31",
+    "2027-01-01",
+    "2027-01-02",
+    "2027-01-03"
+  ])
+  assert.equal(weekDays(sunday, -1)[0], "2026-12-21")
+  assert.equal(weekDays(new Date(2027, 0, 4).getTime())[0], "2027-01-04")
+})
 
 test("cuenta una vez por ID/tipo, incluso con escrituras en curso; reintenta errores", async () => {
   const writes: number[][] = []

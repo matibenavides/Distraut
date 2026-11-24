@@ -1,5 +1,6 @@
 import type { PlasmoCSConfig } from "plasmo"
 
+import { observePlayback } from "./lib/playback"
 import { getSessionTiming } from "./lib/session"
 import { createStatisticsRecorder } from "./lib/statistics"
 import { getStoredState, subscribeToStoredState } from "./lib/storage"
@@ -10,6 +11,16 @@ export const config: PlasmoCSConfig = {
   matches: ["https://www.youtube.com/*"],
   css: ["styles/youtube.css"]
 }
+
+observePlayback(document, async (start, end) => {
+  const result = await chrome.runtime.sendMessage({
+    type: "record-playback",
+    start,
+    end
+  })
+  if (!result?.ok)
+    throw new Error(result?.error || "No se pudo guardar la reproducción.")
+})
 
 let stateChanged = false
 let currentState: StoredState | undefined

@@ -1,7 +1,8 @@
-import { recordHiddenCounts } from "./lib/storage"
+import { recordHiddenCounts, recordPlayback } from "./lib/storage"
 
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
-  if (message?.type !== "record-hidden") return
+  if (message?.type !== "record-hidden" && message?.type !== "record-playback")
+    return
   if (
     sender.id !== chrome.runtime.id ||
     !sender.url?.startsWith("https://www.youtube.com/")
@@ -9,7 +10,11 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     respond({ ok: false, error: "Origen no permitido." })
     return
   }
-  recordHiddenCounts(message.videos, message.shorts).then(
+  const operation =
+    message.type === "record-playback"
+      ? recordPlayback(message.start, message.end)
+      : recordHiddenCounts(message.videos, message.shorts)
+  operation.then(
     () => respond({ ok: true }),
     (error) =>
       respond({

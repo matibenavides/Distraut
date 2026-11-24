@@ -8,6 +8,7 @@ import {
   endStudySession,
   getStoredState,
   recordHiddenCounts,
+  recordPlayback,
   removeCollection,
   removeFilter,
   setCollectionEnabled,
@@ -28,6 +29,45 @@ type Listener = (
   area: string
 ) => void
 let listeners: Set<Listener>
+
+test("reproducción de varias pestañas se suma sin pisar sesiones ni filtros", async () => {
+  const start = Date.now() - 10000
+  await addFilter("keyword", "React")
+  await Promise.all([
+    recordPlayback(start, start + 5000),
+    recordPlayback(start, start + 5000)
+  ])
+  const state = await getStoredState()
+  assert.equal(
+    Object.values(state.statistics!.playbackByDay!).reduce((a, b) => a + b, 0),
+    10000
+  )
+  assert.equal(state.filters.length, 1)
+  await startStudySession(30)
+  await recordHiddenCounts(1, 1)
+  assert.deepEqual(
+    (await getStoredState()).statistics?.playbackByDay,
+    state.statistics?.playbackByDay
+  )
+  await assert.rejects(recordPlayback(start, start - 1), /inválido/)
+  await assert.rejects(recordPlayback(start, Date.now() + 120000), /inválido/)
+  failWrite = true
+  await assert.rejects(
+    recordPlayback(start, start + 1000),
+    /No se pudo guardar/
+  )
+})
+
+test("datos anteriores sin reproducción son válidos y valores corruptos se rechazan", async () => {
+  await recordHiddenCounts(1, 1)
+  const old = await getStoredState()
+  assert.equal(old.statistics?.playbackByDay, undefined)
+  values.distrautState = {
+    ...old,
+    statistics: { ...old.statistics, playbackByDay: { "2026-11-24": -1 } }
+  }
+  await assert.rejects(getStoredState(), /estadísticas guardadas/)
+})
 
 test("estadísticas acumulan sin pisar filtros y rechazan datos incompatibles", async () => {
   await addFilter("keyword", "React")

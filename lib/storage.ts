@@ -5,7 +5,7 @@ import type {
   StoredState
 } from "../types/filter"
 import { createFilter, normalizeFilterValue } from "./filters"
-import { settleStudyTime } from "./statistics"
+import { addPlaybackInterval, settleStudyTime } from "./statistics"
 
 const STORAGE_KEY = "distrautState"
 
@@ -54,7 +54,15 @@ function parseStoredState(stored: unknown): StoredState {
       Array.isArray(stats.studyByDay) ||
       !Object.entries(stats.studyByDay).every(
         ([day, duration]) => /^\d{4}-\d{2}-\d{2}$/.test(day) && count(duration)
-      )
+      ) ||
+      (stats.playbackByDay !== undefined &&
+        (!stats.playbackByDay ||
+          typeof stats.playbackByDay !== "object" ||
+          Array.isArray(stats.playbackByDay) ||
+          !Object.entries(stats.playbackByDay).every(
+            ([day, duration]) =>
+              /^\d{4}-\d{2}-\d{2}$/.test(day) && count(duration)
+          )))
     )
       throw new Error(
         "Las estadísticas guardadas tienen un formato no compatible."
@@ -235,6 +243,34 @@ export function recordHiddenCounts(videos: number, shorts: number) {
         ...statistics,
         videos: statistics.videos + videos,
         shorts: statistics.shorts + shorts
+      }
+    }
+  })
+}
+
+export function recordPlayback(start: number, end: number) {
+  if (
+    ![start, end].every((n) => Number.isSafeInteger(n) && n >= 0) ||
+    end <= start ||
+    end - start > 86400000 ||
+    end > Date.now() + 60000
+  )
+    return Promise.reject(new Error("Intervalo de reproducción inválido."))
+  return updateState((state) => {
+    const statistics = state.statistics ?? {
+      videos: 0,
+      shorts: 0,
+      studyByDay: {}
+    }
+    return {
+      ...state,
+      statistics: {
+        ...statistics,
+        playbackByDay: addPlaybackInterval(
+          statistics.playbackByDay ?? {},
+          start,
+          end
+        )
       }
     }
   })

@@ -37,10 +37,10 @@ function IndexPopup() {
   const [now, setNow] = useState(Date.now())
   useEffect(() => {
     setNow(Date.now())
-    if (!state?.session) return
+    if (!state?.session && tab !== "statistics") return
     const timer = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(timer)
-  }, [state?.session?.endsAt])
+  }, [state?.session?.endsAt, tab])
   const timing = getSessionTiming(state?.session, now)
   const expired = !!timing?.finished
   const inCollection =

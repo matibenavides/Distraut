@@ -34,6 +34,7 @@ export interface UsageStatistics {
   videos: number
   shorts: number
   studyByDay: Record<string, number>
+  playbackByDay?: Record<string, number>
 }
 
 export interface HiddenContent {

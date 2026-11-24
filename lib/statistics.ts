@@ -15,6 +15,7 @@ export function settleStudyTime(
   const until = Math.min(now, session.pausedAt ?? now, session.endsAt)
   if (cursor >= until) return state
   const statistics: UsageStatistics = {
+    ...state.statistics,
     videos: state.statistics?.videos ?? 0,
     shorts: state.statistics?.shorts ?? 0,
     studyByDay: { ...state.statistics?.studyByDay }
@@ -42,6 +43,57 @@ export function settleStudyTime(
     statistics,
     session: { ...session, accountedThrough: until }
   }
+}
+
+export function localDay(time: number): string {
+  const date = new Date(time)
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
+}
+
+export function addPlaybackInterval(
+  days: Record<string, number>,
+  start: number,
+  end: number
+) {
+  const result = { ...days }
+  while (start < end) {
+    const date = new Date(start)
+    const next = Math.min(
+      end,
+      new Date(
+        date.getFullYear(),
+        date.getMonth(),
+        date.getDate() + 1
+      ).getTime()
+    )
+    const day = localDay(start)
+    const value = (result[day] ?? 0) + next - start
+    if (!Number.isSafeInteger(value))
+      throw new Error("Tiempo de reproducción fuera de rango.")
+    result[day] = value
+    start = next
+  }
+  return result
+}
+
+export function weekDays(anchor: number, offset = 0): string[] {
+  const date = new Date(anchor)
+  date.setHours(12, 0, 0, 0)
+  date.setDate(date.getDate() - ((date.getDay() + 6) % 7) + offset * 7)
+  return Array.from({ length: 7 }, (_, index) => {
+    const day = new Date(date)
+    day.setDate(date.getDate() + index)
+    return localDay(day.getTime())
+  })
+}
+
+export function formatTime(ms: number): string {
+  const seconds = Math.floor(ms / 1000)
+  if (seconds < 60) return `${seconds} s`
+  const minutes = Math.floor(seconds / 60)
+  return minutes < 60
+    ? `${minutes} min`
+    : `${Math.floor(minutes / 60)} h ${minutes % 60} min`
 }
 
 export function createStatisticsRecorder(

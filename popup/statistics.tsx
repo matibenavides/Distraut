@@ -1,6 +1,12 @@
-import { Statistic } from "antd"
+import { Button, Progress, Statistic, Tag, Tooltip } from "antd"
+import { useState } from "react"
 
-import { settleStudyTime } from "../lib/statistics"
+import {
+  formatTime,
+  localDay,
+  settleStudyTime,
+  weekDays
+} from "../lib/statistics"
 import type { StoredState } from "../types/filter"
 
 export function StatisticsPanel({
@@ -12,6 +18,8 @@ export function StatisticsPanel({
   error: string
   now: number
 }) {
+  const [offset, setOffset] = useState(0)
+  const [selected, setSelected] = useState(localDay(now))
   if (!state)
     return (
       <p role={error ? "alert" : "status"}>
@@ -23,64 +31,180 @@ export function StatisticsPanel({
     shorts: 0,
     studyByDay: {}
   }
-  const days = Object.entries(stats.studyByDay).sort(([a], [b]) =>
-    b.localeCompare(a)
+  const days = weekDays(now, offset)
+  const focus = days.includes(selected) ? selected : days[0]
+  const playback = (day: string) => stats.playbackByDay?.[day] ?? 0
+  const study = (day: string) => stats.studyByDay[day] ?? 0
+  const totalPlayback = days.reduce((sum, day) => sum + playback(day), 0)
+  const totalStudy = days.reduce((sum, day) => sum + study(day), 0)
+  const scale = Math.max(
+    60000,
+    ...days.flatMap((day) => [playback(day), study(day)])
   )
+  const dateLabel = (day: string) =>
+    new Date(day + "T12:00:00").toLocaleDateString("es-CL", {
+      day: "numeric",
+      month: "short"
+    })
   return (
-    <>
-      <h1>Estadísticas</h1>
-      <p>
-        Tu actividad de filtrado y concentración, guardada en este dispositivo.
-      </p>
-      <section aria-label="Contenido ocultado">
+    <div className="weekly-statistics">
+      <div className="row">
+        <h1>Tu semana</h1>
+        <Tag color="purple">Lun a dom</Tag>
+      </div>
+      <p className="weekly-intro">Reproducción y concentración, día a día.</p>
+      <div className="week-navigation">
+        <Button
+          type="text"
+          aria-label="Semana anterior"
+          onClick={() => setOffset(offset - 1)}>
+          ‹
+        </Button>
+        <span>
+          {dateLabel(days[0])} – {dateLabel(days[6])}{" "}
+          <small>{days[3].slice(0, 4)}</small>
+        </span>
+        <Button
+          type="text"
+          aria-label="Semana siguiente"
+          disabled={offset === 0}
+          onClick={() => setOffset(offset + 1)}>
+          ›
+        </Button>
+      </div>
+      <div className="weekly-totals">
         <Statistic
-          title="Ocultaciones acumuladas"
-          value={stats.videos + stats.shorts}
+          title="YouTube esta semana"
+          value={formatTime(totalPlayback)}
         />
-        <div className="row statistics-counts">
-          <Statistic title="Videos" value={stats.videos} />
-          <Statistic title="Shorts" value={stats.shorts} />
+        <Statistic title="Concentración" value={formatTime(totalStudy)} />
+      </div>
+      <section
+        className="week-chart-section"
+        aria-label="Comparación diaria de lunes a domingo">
+        <div className="chart-legend">
+          <span>
+            <i className="playback-dot" />
+            Reproducción
+          </span>
+          <span>
+            <i className="study-dot" />
+            Concentración
+          </span>
         </div>
-        <small>
-          Cada contenido cuenta una vez por página cargada. Recargar o abrir
-          otra pestaña puede sumarlo de nuevo.
+        <div className="week-chart">
+          {days.map((day, index) => (
+            <Tooltip
+              key={day}
+              title={
+                dateLabel(day) +
+                ": " +
+                formatTime(playback(day)) +
+                " YouTube · " +
+                formatTime(study(day)) +
+                " concentración"
+              }>
+              <button
+                className="week-day"
+                aria-label={
+                  dateLabel(day) +
+                  ", reproducción " +
+                  formatTime(playback(day)) +
+                  ", concentración " +
+                  formatTime(study(day))
+                }
+                aria-pressed={day === focus}
+                onClick={() => setSelected(day)}>
+                <span className="day-bars">
+                  {[
+                    {
+                      value: playback(day),
+                      color: "#378374",
+                      label: "Reproducción"
+                    },
+                    {
+                      value: study(day),
+                      color: "#6141b8",
+                      label: "Concentración"
+                    }
+                  ].map((metric) => (
+                    <span className="bar-slot" key={metric.label}>
+                      <Progress
+                        className="weekly-progress"
+                        type="line"
+                        size={[112, 10]}
+                        percent={(metric.value / scale) * 100}
+                        showInfo={false}
+                        status="normal"
+                        strokeColor={metric.color}
+                        railColor="#eee9f4"
+                        aria-label={
+                          metric.label + ": " + formatTime(metric.value)
+                        }
+                      />
+                    </span>
+                  ))}
+                </span>
+                <span className="day-name">
+                  {["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"][index]}
+                </span>
+                <span className="day-number">{Number(day.slice(-2))}</span>
+                {day === localDay(now) && <span className="today-mark" />}
+              </button>
+            </Tooltip>
+          ))}
+        </div>
+        <small className="chart-scale">
+          Escala común: {formatTime(scale)}. Selecciona un día para ver el
+          detalle.
         </small>
-      </section>
-      <section>
-        <h2>Tiempo de estudio por día</h2>
-        <p>Concentración de tus sesiones, sin pausas ni descansos.</p>
-        {days.length ? (
-          <table className="study-days">
-            <thead>
-              <tr>
-                <th scope="col">Día</th>
-                <th scope="col">Tiempo</th>
-              </tr>
-            </thead>
-            <tbody>
-              {days.map(([day, ms]) => {
-                const seconds = Math.floor(ms / 1000)
-                const duration = `${Math.floor(seconds / 3600)} h ${Math.floor(seconds / 60) % 60} min ${seconds % 60} s`
-                return (
-                  <tr key={day}>
-                    <td>
-                      {new Date(`${day}T12:00:00`).toLocaleDateString("es-CL")}
-                    </td>
-                    <td>{duration}</td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        ) : (
-          <p role="status">Aún no hay tiempo de estudio registrado.</p>
+        {!totalPlayback && !totalStudy && (
+          <p className="week-empty" role="status">
+            Sin actividad esta semana. Reproduce un video o comienza una sesión.
+          </p>
         )}
-        <small>
-          Fechas locales. Una sesión en marcha sigue contando con el popup
-          cerrado; no mide atención real. Las sesiones ya terminadas antes de
-          esta función no se recuperan.
-        </small>
       </section>
-    </>
+      <div className="daily-detail" aria-live="polite">
+        <div className="row">
+          <h2>{focus === localDay(now) ? "Hoy" : dateLabel(focus)}</h2>
+          {offset !== 0 && (
+            <Button
+              type="link"
+              size="small"
+              onClick={() => {
+                setOffset(0)
+                setSelected(localDay(now))
+              }}>
+              Esta semana
+            </Button>
+          )}
+        </div>
+        <div className="daily-times">
+          <div>
+            <span>YouTube</span>
+            <strong>{formatTime(playback(focus))}</strong>
+          </div>
+          <div>
+            <span>Concentración</span>
+            <strong>{formatTime(study(focus))}</strong>
+          </div>
+        </div>
+      </div>
+      <div className="hidden-summary">
+        <span>
+          Contenido ocultado <small>Acumulado local</small>
+        </span>
+        <strong>{stats.videos + stats.shorts}</strong>
+        <span>
+          {stats.videos} videos
+          <br />
+          {stats.shorts} Shorts
+        </span>
+      </div>
+      <p className="statistics-note">
+        YouTube suma el tiempo reproduciendo de cada pestaña, incluso en segundo
+        plano. Concentración excluye pausas y descansos. Las fechas son locales.
+      </p>
+    </div>
   )
 }
