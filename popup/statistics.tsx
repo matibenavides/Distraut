@@ -1,4 +1,4 @@
-import { Button, Progress, Statistic, Tag, Tooltip } from "antd"
+import { Button, Progress, Tag, Tooltip } from "antd"
 import { useState } from "react"
 
 import {
@@ -38,8 +38,7 @@ export function StatisticsPanel({
   const focus = days.includes(selected) ? selected : days[0]
   const playback = (day: string) => stats.playbackByDay?.[day] ?? 0
   const study = (day: string) => stats.studyByDay[day] ?? 0
-  const totalPlayback = days.reduce((sum, day) => sum + playback(day), 0)
-  const totalStudy = days.reduce((sum, day) => sum + study(day), 0)
+  const hasActivity = days.some((day) => playback(day) > 0 || study(day) > 0)
   const dateLabel = (day: string) =>
     new Date(day + "T12:00:00").toLocaleDateString("es-CL", {
       day: "numeric",
@@ -51,32 +50,41 @@ export function StatisticsPanel({
         <h1>Tu semana</h1>
         <Tag color="purple">Lun a dom</Tag>
       </div>
-      <p className="weekly-intro">Reproducción y concentración, día a día.</p>
-      <div className="week-navigation">
-        <Button
-          type="text"
-          aria-label="Semana anterior"
-          onClick={() => setOffset(offset - 1)}>
-          ‹
-        </Button>
-        <span>
-          {dateLabel(days[0])} – {dateLabel(days[6])}{" "}
-          <small>{days[3].slice(0, 4)}</small>
-        </span>
-        <Button
-          type="text"
-          aria-label="Semana siguiente"
-          disabled={offset === 0}
-          onClick={() => setOffset(offset + 1)}>
-          ›
-        </Button>
-      </div>
-      <div className="weekly-totals">
-        <Statistic
-          title="YouTube esta semana"
-          value={formatTime(totalPlayback)}
-        />
-        <Statistic title="Concentración" value={formatTime(totalStudy)} />
+      <div className="daily-detail" aria-live="polite">
+        <div className="row">
+          <h2>{focus === localDay(now) ? "Hoy" : dateLabel(focus)}</h2>
+          {offset !== 0 && (
+            <Button
+              type="link"
+              size="small"
+              onClick={() => {
+                setOffset(0)
+                setSelected(localDay(now))
+              }}>
+              Esta semana
+            </Button>
+          )}
+        </div>
+        <div className="daily-times">
+          <div>
+            <span>YouTube</span>
+            <strong>{formatTime(playback(focus))}</strong>
+            {playback(focus) > progressLimit && (
+              <small className="daily-excess">
+                +{formatTime(playback(focus) - progressLimit)} sobre la escala
+              </small>
+            )}
+          </div>
+          <div>
+            <span>Concentración</span>
+            <strong>{formatTime(study(focus))}</strong>
+            {study(focus) > progressLimit && (
+              <small className="daily-excess">
+                +{formatTime(study(focus) - progressLimit)} sobre la escala
+              </small>
+            )}
+          </div>
+        </div>
       </div>
       <section
         className="week-chart-section"
@@ -179,52 +187,36 @@ export function StatisticsPanel({
             </Tooltip>
           ))}
         </div>
+        <p className="weekly-intro">Reproducción y concentración, día a día.</p>
+        <div className="week-navigation">
+          <Button
+            type="text"
+            aria-label="Semana anterior"
+            onClick={() => setOffset(offset - 1)}>
+            ‹
+          </Button>
+          <span>
+            {dateLabel(days[0])} – {dateLabel(days[6])}{" "}
+            <small>{days[3].slice(0, 4)}</small>
+          </span>
+          <Button
+            type="text"
+            aria-label="Semana siguiente"
+            disabled={offset === 0}
+            onClick={() => setOffset(offset + 1)}>
+            ›
+          </Button>
+        </div>
         <small className="chart-scale">
           Escala común: 5 h por día. La marca violeta aparece al alcanzar 3 h de
           concentración. El signo + indica tiempo por encima de la escala.
         </small>
-        {!totalPlayback && !totalStudy && (
+        {!hasActivity && (
           <p className="week-empty" role="status">
             Sin actividad esta semana. Reproduce un video o comienza una sesión.
           </p>
         )}
       </section>
-      <div className="daily-detail" aria-live="polite">
-        <div className="row">
-          <h2>{focus === localDay(now) ? "Hoy" : dateLabel(focus)}</h2>
-          {offset !== 0 && (
-            <Button
-              type="link"
-              size="small"
-              onClick={() => {
-                setOffset(0)
-                setSelected(localDay(now))
-              }}>
-              Esta semana
-            </Button>
-          )}
-        </div>
-        <div className="daily-times">
-          <div>
-            <span>YouTube</span>
-            <strong>{formatTime(playback(focus))}</strong>
-            {playback(focus) > progressLimit && (
-              <small className="daily-excess">
-                +{formatTime(playback(focus) - progressLimit)} sobre la escala
-              </small>
-            )}
-          </div>
-          <div>
-            <span>Concentración</span>
-            <strong>{formatTime(study(focus))}</strong>
-            {study(focus) > progressLimit && (
-              <small className="daily-excess">
-                +{formatTime(study(focus) - progressLimit)} sobre la escala
-              </small>
-            )}
-          </div>
-        </div>
-      </div>
       <div className="hidden-summary">
         <span>
           Contenido ocultado <small>Acumulado local</small>

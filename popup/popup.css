@@ -42,26 +42,6 @@ body {
   display: inline;
   margin-left: 6px;
 }
-.weekly-totals {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-}
-.weekly-totals .ant-statistic-content {
-  font-size: 23px;
-  font-weight: 600;
-  letter-spacing: -0.04em;
-}
-.weekly-totals .ant-statistic-title {
-  font-size: 12px;
-  margin-bottom: 4px;
-}
-.weekly-totals .ant-statistic:first-child .ant-statistic-content {
-  color: #286b60;
-}
-.weekly-totals .ant-statistic:last-child .ant-statistic-content {
-  color: #6141b8;
-}
 .weekly-statistics .week-chart-section {
   margin-top: 12px;
   padding-top: 8px;
