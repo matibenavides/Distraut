@@ -118,7 +118,10 @@ function isCollection(value: unknown): value is FilterCollection {
     typeof value.name === "string" &&
     !!value.name.trim() &&
     "enabled" in value &&
-    typeof value.enabled === "boolean"
+    typeof value.enabled === "boolean" &&
+    (!("createdFrom" in value) ||
+      value.createdFrom === "keyword" ||
+      value.createdFrom === "channel")
   )
 }
 
@@ -405,8 +408,18 @@ export function moveFiltersToCollection(
   )
 }
 
-export function addCollection(name: string, selection?: FilterSelection) {
+export function addCollection(
+  name: string,
+  selection?: FilterSelection,
+  createdFrom?: FilterType
+) {
   return updateState((state) => {
+    if (
+      createdFrom !== undefined &&
+      createdFrom !== "keyword" &&
+      createdFrom !== "channel"
+    )
+      throw new Error("El origen de la colección no es compatible.")
     const groups = state.collections ?? []
     const normalized = normalizeFilterValue(name)
     if (!normalized) throw new Error("Escribe un nombre para la colección.")
@@ -416,7 +429,12 @@ export function addCollection(name: string, selection?: FilterSelection) {
       )
     if (groups.some((group) => normalizeFilterValue(group.name) === normalized))
       throw new Error("Ya existe una colección con ese nombre.")
-    const group = { id: crypto.randomUUID(), name: name.trim(), enabled: true }
+    const group: FilterCollection = {
+      id: crypto.randomUUID(),
+      name: name.trim(),
+      enabled: true
+    }
+    if (createdFrom !== undefined) group.createdFrom = createdFrom
     const next = { ...state, collections: [...groups, group] }
     return selection ? assignFilters(next, selection, group) : next
   })

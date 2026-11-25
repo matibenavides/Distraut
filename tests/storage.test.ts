@@ -1,7 +1,11 @@
 import assert from "node:assert/strict"
 import { beforeEach, test } from "node:test"
 
-import { MAX_COLLECTION_NAME_LENGTH, orderedCollections } from "../lib/filters"
+import {
+  collectionVisibleForType,
+  MAX_COLLECTION_NAME_LENGTH,
+  orderedCollections
+} from "../lib/filters"
 import { shouldHideVideo } from "../lib/matching"
 import {
   addCollection,
@@ -56,6 +60,50 @@ test("el límite se aplica al crear carpetas y conserva los nombres antiguos", a
   values.distrautState = { ...before, collections: [legacy] }
   const after = await addCollection("Nueva")
   assert.deepEqual(after.collections![0], legacy)
+})
+
+test("una carpeta nace en su apartado y aparece en el otro al recibir sus filtros", async () => {
+  const created = await addCollection("Música", undefined, "channel")
+  const group = created.collections![0]
+  assert.equal(group.createdFrom, "channel")
+  assert.equal(
+    collectionVisibleForType(group, created.filters, "channel"),
+    true
+  )
+  assert.equal(
+    collectionVisibleForType(group, created.filters, "keyword"),
+    false
+  )
+  const word = (await addFilter("keyword", "Conciertos")).filters[0]
+  const moved = await moveFiltersToCollection([word], group.id)
+  const reloaded = await getStoredState()
+  assert.equal(reloaded.collections![0].createdFrom, "channel")
+  assert.equal(
+    collectionVisibleForType(group, reloaded.filters, "keyword"),
+    true
+  )
+  assert.equal(
+    collectionVisibleForType(group, reloaded.filters, "channel"),
+    true
+  )
+  const emptied = await removeFilter(moved.filters[0].id)
+  assert.equal(
+    collectionVisibleForType(group, emptied.filters, "keyword"),
+    false
+  )
+  const keyword = (await addCollection("Lectura", undefined, "keyword"))
+    .collections![1]
+  assert.equal(collectionVisibleForType(keyword, [], "channel"), false)
+  const legacy = { id: "old", name: "Anterior", enabled: true }
+  values.distrautState = { ...emptied, collections: [legacy] }
+  assert.deepEqual((await getStoredState()).collections, [legacy])
+  assert.equal(collectionVisibleForType(legacy, [], "keyword"), true)
+  assert.equal(collectionVisibleForType(legacy, [], "channel"), true)
+  values.distrautState = {
+    ...emptied,
+    collections: [{ ...group, createdFrom: "otro" }]
+  }
+  await assert.rejects(getStoredState(), /compatible/)
 })
 
 let values: Record<string, unknown>

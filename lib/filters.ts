@@ -8,6 +8,19 @@ export function orderedCollections(
   return [...collections].reverse()
 }
 
+export function collectionVisibleForType(
+  group: FilterCollection,
+  filters: readonly Filter[],
+  type: FilterType
+) {
+  const rules = filters.filter((rule) => rule.collectionId === group.id)
+  return (
+    group.createdFrom === type ||
+    rules.some((rule) => rule.type === type) ||
+    (group.createdFrom === undefined && rules.length === 0)
+  )
+}
+
 export function normalizeFilterValue(value: string): string {
   return value
     .normalize("NFD")

@@ -12,6 +12,7 @@ import {
 } from "react"
 
 import {
+  collectionVisibleForType,
   MAX_COLLECTION_NAME_LENGTH,
   orderedCollections
 } from "../../../lib/filters"
@@ -52,7 +53,7 @@ function FilterGroup({
   toggle: (rule: Filter) => void
   startDrag: (event: DragEvent, rule: Filter) => void
   endDrag: () => void
-  createWithSelection: (name: string) => Promise<boolean>
+  createWithSelection: (name: string, type: FilterType) => Promise<boolean>
   dropTarget: (
     group: FilterCollection | undefined,
     surface: FilterType
@@ -69,9 +70,7 @@ function FilterGroup({
   const collectionTrigger = useRef<HTMLButtonElement>(null)
   const editingCollection = collectionName !== null
   const byCollection = new Map<string, StoredState["filters"]>()
-  const occupied = new Set<string>()
   for (const rule of state.filters) {
-    if (rule.collectionId) occupied.add(rule.collectionId)
     if (rule.type !== type) continue
     const id = rule.collectionId ?? ""
     const entries = byCollection.get(id)
@@ -79,8 +78,8 @@ function FilterGroup({
     else byCollection.set(id, [rule])
   }
   const rules = (byCollection.get("") ?? []).reverse()
-  const groups = orderedCollections(state.collections).filter(
-    (group) => byCollection.has(group.id) || !occupied.has(group.id)
+  const groups = orderedCollections(state.collections).filter((group) =>
+    collectionVisibleForType(group, state.filters, type)
   )
 
   useEffect(() => {
@@ -215,7 +214,11 @@ function FilterGroup({
                 }}
                 onSubmit={async (event) => {
                   event.preventDefault()
-                  if (await save(() => addCollection(collectionName))) {
+                  if (
+                    await save(() =>
+                      addCollection(collectionName, undefined, type)
+                    )
+                  ) {
                     setCollectionName(null)
                     setMessage(`Colección «${collectionName.trim()}» creada.`)
                   }
@@ -247,7 +250,7 @@ function FilterGroup({
                     size="small"
                     disabled={busy}
                     onClick={async () => {
-                      if (await createWithSelection(collectionName))
+                      if (await createWithSelection(collectionName, type))
                         setCollectionName(null)
                     }}>
                     Crear y mover
@@ -374,7 +377,8 @@ export function AddFilter({
   }
   async function transfer(
     batch: Filter[],
-    destination: FilterCollection | string | undefined
+    destination: FilterCollection | string | undefined,
+    createdFrom?: FilterType
   ) {
     if (busy || !batch.length) return false
     const newCollection = typeof destination === "string"
@@ -386,7 +390,7 @@ export function AddFilter({
     if (
       await save(() =>
         newCollection
-          ? addCollection(destination, batch)
+          ? addCollection(destination, batch, createdFrom)
           : moveFiltersToCollection(batch, destination?.id)
       )
     ) {
@@ -463,7 +467,8 @@ export function AddFilter({
     startDrag,
     endDrag,
     dropTarget,
-    createWithSelection: (name: string) => transfer(selected, name)
+    createWithSelection: (name: string, type: FilterType) =>
+      transfer(selected, name, type)
   }
   return (
     <div className="filter-composer" ref={composer}>

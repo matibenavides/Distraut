@@ -12,6 +12,7 @@ export interface FilterCollection {
   id: string
   name: string
   enabled: boolean
+  createdFrom?: FilterType
 }
 
 export interface StoredState {
