@@ -1,0 +1,126 @@
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  width: 440px;
+  margin: 0;
+  background: #fcfaff;
+  color: #30293f;
+  font:
+    14px/1.4 system-ui,
+    "Segoe UI",
+    sans-serif;
+}
+fieldset {
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  border: 0;
+}
+h1 {
+  margin: 0;
+  font-size: 26px;
+  letter-spacing: -0.04em;
+}
+h2 {
+  margin: 0;
+  font-size: 17px;
+}
+p,
+small {
+  color: #625b70;
+}
+p {
+  margin: 6px 0 0;
+}
+small {
+  display: block;
+  font-size: 12px;
+}
+section {
+  border-top: 1px solid #e4dfeb;
+  margin-top: 18px;
+  padding-top: 16px;
+}
+.row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.row {
+  justify-content: space-between;
+}
+button,
+input,
+select {
+  font: inherit;
+}
+button:not(.ant-switch):not(.ant-btn) {
+  border: 0;
+  background: transparent;
+  padding: 6px;
+  color: #624096;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+button:not(.ant-switch):not(.ant-btn):hover {
+  background: #eee6f6;
+}
+button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+:focus-visible {
+  outline: 2px solid #6141b8;
+  outline-offset: 2px;
+}
+.popup button.primary {
+  background: #65449a;
+  color: white;
+  padding: 8px 14px;
+}
+.popup button.primary:hover {
+  background: #51347f;
+}
+button.pill {
+  background: #ede5f5;
+  border-radius: 20px;
+  padding: 5px 10px;
+}
+button.pill[aria-pressed="true"] {
+  background: #d8efe3;
+  color: #265b43;
+}
+input,
+select {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid #d2cadd;
+  border-radius: 8px;
+  color: inherit;
+  background: white;
+}
+input[type="search"] {
+  margin: 8px 0;
+  background: #f1edf5;
+}
+label {
+  display: block;
+  margin: 10px 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.create-form {
+  margin-bottom: 12px;
+}
+.error {
+  color: #872342;
+}
+.create-form h2 {
+  margin-bottom: 8px;
+}

@@ -16,15 +16,23 @@ npm run dev
 
 Open your browser and load the appropriate development build. For example, if you are developing for the chrome browser, using manifest v3, use: `build/chrome-mv3-dev`.
 
-You can start editing the popup in `popup/index.tsx`. Plasmo recognizes this directory entry automatically. Its stylesheet and Ant Design theme live alongside it in `popup/popup.css` and `popup/theme.ts`. The YouTube content script is `content.ts`, with injected CSS in `styles/youtube.css`. After rebuilding content scripts, reload the extension and the YouTube page.
+You can start editing the popup in `popup/index.tsx`. Plasmo recognizes this directory entry automatically. `popup/popup.css` loads shared styles and the styles beside each feature's components; `popup/theme.ts` defines the Ant Design theme. The YouTube content script is `content.ts`, with injected CSS in `styles/youtube.css`. After rebuilding content scripts, reload the extension and the YouTube page.
 
 ## Source layout
 
 ```text
 popup/
-  index.tsx       # Plasmo popup entry and React view
-  popup.css       # Popup layout and surfaces
+  index.tsx       # Plasmo entry, state and view coordination
+  popup.css       # Ordered CSS imports
   theme.ts        # Ant Design tokens
+  types.ts        # Shared popup contracts (Save callback)
+  styles/
+    base.css      # Typography, controls and shared utilities
+    layout.css    # Popup shell, switches and collections
+  components/
+    filters/      # AddFilter, RuleLibrary and filters.css
+    study-session/ # StudySession and study-session.css
+    statistics/   # StatisticsPanel and statistics.css
 content.ts        # Plain TypeScript entry for YouTube
 styles/
   youtube.css     # Reversible hiding class injected into YouTube
@@ -35,6 +43,8 @@ design/           # Visual direction and sketch brief
 ```
 
 The popup directory is an official [Plasmo extension page convention](https://docs.plasmo.com/framework/ext-pages). Other folder names organize this project; Plasmo does not require them. Keep React and Ant Design imports inside the popup. Add components when an actual feature needs them.
+
+Keep feature-specific styles beside their components. Shared foundations belong in `popup/styles/base.css`; styles for views still owned by the entry belong in `popup/styles/layout.css`. Import CSS only through `popup/popup.css`, in the order base → layout → features, so the global cascade stays explicit. Components receive the `Save` callback through props and import its type from `popup/types.ts`, without depending on the popup entry.
 
 For further guidance, [visit our Documentation](https://docs.plasmo.com/)
 

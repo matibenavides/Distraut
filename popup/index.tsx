@@ -14,15 +14,14 @@ import {
   useUntimedFiltering
 } from "../lib/storage"
 import type { FilterCollection, StoredState } from "../types/filter"
-import { AddFilter } from "./add-filter"
-import { RuleLibrary } from "./rule-library"
-import { StatisticsPanel } from "./statistics"
-import { StudySession } from "./study-session"
+import { AddFilter } from "./components/filters/add-filter"
+import { RuleLibrary } from "./components/filters/rule-library"
+import { StatisticsPanel } from "./components/statistics/statistics"
+import { StudySession } from "./components/study-session/study-session"
 import { popupTheme } from "./theme"
+import type { Save } from "./types"
 
 import "./popup.css"
-
-export type Save = (operation: () => Promise<StoredState>) => Promise<boolean>
 
 function IndexPopup() {
   const [state, setState] = useState<StoredState>()

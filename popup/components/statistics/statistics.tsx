@@ -6,8 +6,8 @@ import {
   localDay,
   settleStudyTime,
   weekDays
-} from "../lib/statistics"
-import type { StoredState } from "../types/filter"
+} from "../../../lib/statistics"
+import type { StoredState } from "../../../types/filter"
 
 const progressLimit = 5 * 60 * 60000
 const studyReference = 3 * 60 * 60000

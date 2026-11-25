@@ -1,15 +1,15 @@
 import { Button, Checkbox, InputNumber, Statistic } from "antd"
 import { useState } from "react"
 
-import { getSessionTiming } from "../lib/session"
+import { getSessionTiming } from "../../../lib/session"
 import {
   endStudySession,
   setStudySessionPaused,
   startStudySession,
   useUntimedFiltering
-} from "../lib/storage"
-import type { StoredState } from "../types/filter"
-import type { Save } from "./index"
+} from "../../../lib/storage"
+import type { StoredState } from "../../../types/filter"
+import type { Save } from "../../types"
 
 export function StudySession({
   state,
@@ -130,7 +130,8 @@ export function StudySession({
               suffix="min"
               aria-label="Minutos de concentración"
             />
-            <Button style={{ paddingBottom: "4px" }}
+            <Button
+              style={{ paddingBottom: "4px" }}
               aria-label="Sumar 5 minutos"
               disabled={minutes !== null && minutes >= 240}
               onClick={() => setMinutes(Math.min(240, (minutes ?? 30) + 5))}>

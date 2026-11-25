@@ -1,0 +1,63 @@
+.popup {
+  padding: 20px;
+  min-height: 324px;
+  max-height: 600px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+.status {
+  background: #ede5f5;
+  border-radius: 20px;
+  padding: 5px 10px;
+}
+.status[data-on="true"] {
+  background: #d8efe3;
+  color: #265b43;
+}
+.status {
+  font-size: 12px;
+  font-weight: 600;
+}
+.collection-name {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.collection-name small {
+  font-weight: 400;
+}
+.collection-row {
+  padding: 7px 0;
+}
+.collection-list {
+  max-height: 310px;
+  overflow-y: auto;
+}
+.collection-list .collection-row {
+  border-bottom: 1px solid #e4dfeb;
+}
+.back {
+  margin: 0 0 8px -6px;
+}
+.filter-control {
+  margin: 10px 0 0;
+}
+.filter-control label {
+  margin: 0;
+  font-size: 13px;
+}
+.popup-collection {
+  background: #eff8f3;
+  border-top: 5px solid #43846c;
+}
+.collection-context {
+  color: #2b5c48;
+  margin: 8px 0 18px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #c7dfd1;
+}
+.popup-collection h1 {
+  overflow-wrap: anywhere;
+  line-height: 1.2;
+}

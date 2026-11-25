@@ -1,0 +1,61 @@
+.types {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.types button[aria-pressed="true"] {
+  background: #ede5f5;
+  border-radius: 20px;
+  padding: 5px 10px;
+}
+.rule-name {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.rule-name small {
+  font-weight: 400;
+}
+.rules li {
+  border-bottom: 1px solid #e4dfeb;
+}
+.library-tools,
+.pager {
+  margin: 12px 0 0;
+  font-size: 13px;
+}
+.types {
+  gap: 2px;
+}
+.rules {
+  list-style: none;
+  margin: 6px 0;
+  padding: 0;
+}
+.rules li {
+  min-height: 48px;
+  gap: 3px;
+}
+.rules button {
+  font-size: 12px;
+}
+.pager small {
+  margin-right: auto;
+}
+.destination-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  margin-top: 6px;
+}
+.destination-row > div {
+  flex: 1;
+  min-width: 0;
+}
+.destination-row .primary {
+  min-height: 38px;
+}
+.feedback {
+  margin-top: 8px;
+}

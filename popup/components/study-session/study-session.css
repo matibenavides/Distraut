@@ -1,0 +1,75 @@
+.session-panel {
+  padding: 14px 16px;
+  border: 0;
+  border-radius: 14px;
+  background: #eee6f7;
+}
+.session-label {
+  color: #624096;
+  font-size: 12px;
+}
+.session-panel form {
+  margin: 8px 0;
+}
+.session-panel input {
+  width: 85px;
+}
+.session-panel progress {
+  display: block;
+  width: 100%;
+  height: 8px;
+  accent-color: #65449a;
+  margin: 8px 0 12px;
+}
+.clock {
+  font-size: 40px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.04em;
+}
+.clock-row {
+  justify-content: flex-start;
+  gap: 12px;
+}
+.session-panel[data-phase="break"] {
+  background: #def1e6;
+}
+.session-clock .ant-statistic-content {
+  font-size: 40px;
+  font-variant-numeric: tabular-nums;
+  color: #30293f;
+}
+.session-clock .ant-statistic-title {
+  color: #625b70;
+  font-size: 12px;
+}
+.session-actions {
+  justify-content: flex-start;
+}
+.session-help {
+  margin-top: 12px;
+}
+.duration-picker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 12px 0 16px;
+}
+.duration-picker .ant-input-number {
+  width: 150px;
+}
+.session-panel .duration-picker .ant-input-number-input {
+  text-align: center;
+  font-size: 32px;
+  width: 100%;
+  padding: 8px;
+}
+.duration-picker .ant-btn {
+  width: 40px;
+  height: 40px;
+  font-size: 22px;
+}
+.duration-summary {
+  font-size: 12px;
+  margin: 10px 0 14px;
+}

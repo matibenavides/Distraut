@@ -1,10 +1,10 @@
 import { useState } from "react"
 
-import { normalizeFilterValue } from "../lib/filters"
-import { removeFilter, setFilterEnabled } from "../lib/storage"
-import type { FilterType, StoredState } from "../types/filter"
+import { normalizeFilterValue } from "../../../lib/filters"
+import { removeFilter, setFilterEnabled } from "../../../lib/storage"
+import type { FilterType, StoredState } from "../../../types/filter"
+import type { Save } from "../../types"
 import { AddFilter } from "./add-filter"
-import type { Save } from "./index"
 
 const pageSize = 4
 const individual = "individual"

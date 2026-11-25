@@ -1,8 +1,8 @@
 import { useState } from "react"
 
-import { addFilter } from "../lib/storage"
-import type { FilterType, StoredState } from "../types/filter"
-import type { Save } from "./index"
+import { addFilter } from "../../../lib/storage"
+import type { FilterType, StoredState } from "../../../types/filter"
+import type { Save } from "../../types"
 
 export function AddFilter({
   state,
