@@ -1,5 +1,6 @@
 import type { HiddenContent, StoredState, VideoMetadata } from "../types/filter"
 import { shouldHideVideo } from "./matching"
+import { isConcentrating } from "./session"
 
 const VIDEO_CARD_SELECTOR = [
   "ytd-rich-grid-renderer ytd-rich-item-renderer[lockup]",
@@ -64,9 +65,18 @@ export function applyVideoFilters(
       )
     )
   }
+  for (const panel of root.querySelectorAll(
+    "ytd-watch-next-secondary-results-renderer, .distraut-suggested-hidden"
+  )) {
+    panel.classList.toggle(
+      "distraut-suggested-hidden",
+      (!!state.hideSuggested || isConcentrating(state.session)) &&
+        panel.matches("ytd-watch-next-secondary-results-renderer")
+    )
+  }
   const hidden = new Map<string, HiddenContent>()
   for (const link of root.querySelectorAll(
-    '.distraut-hidden a[href^="/watch?v="], .distraut-shorts-hidden a[href^="/shorts/"]'
+    '.distraut-hidden a[href^="/watch?v="], .distraut-shorts-hidden a[href^="/shorts/"], .distraut-suggested-hidden a[href^="/watch?v="], .distraut-suggested-hidden a[href^="/shorts/"]'
   )) {
     const url = new URL(link.getAttribute("href")!, "https://www.youtube.com")
     const kind = url.pathname === "/watch" ? "videos" : "shorts"

@@ -24,6 +24,114 @@ const lockup = (title: string, channel: string) => `
 
 const short = `<ytm-shorts-lockup-view-model-v2><ytm-shorts-lockup-view-model><a href="/shorts/abc">Short</a></ytm-shorts-lockup-view-model></ytm-shorts-lockup-view-model-v2>`
 
+test("oculta sugeridos reversiblemente y conserva player, chat, listas y otros filtros", () => {
+  const { document } = parseHTML(
+    `<div id="movie_player"><video></video></div><div id="chat"></div><ytd-playlist-panel-renderer></ytd-playlist-panel-renderer><ytd-watch-next-secondary-results-renderer>${lockup("React", "Canal")}${short}</ytd-watch-next-secondary-results-renderer><ytd-search><ytd-video-renderer is-search><a id="video-title" href="/watch?v=other">React</a></ytd-video-renderer></ytd-search>`
+  )
+  const state: StoredState = {
+    schemaVersion: 1,
+    enabled: true,
+    filters: [{ id: "r", type: "keyword", value: "React", enabled: true }],
+    hideSuggested: true
+  }
+  const panel = document.querySelector(
+    "ytd-watch-next-secondary-results-renderer"
+  )!
+  const hidden = applyVideoFilters(document, state)
+  assert.equal(panel.classList.contains("distraut-suggested-hidden"), true)
+  assert.equal(
+    hidden.filter((item) => item.id === "abc" && item.kind === "videos").length,
+    1
+  )
+  assert.equal(hidden.filter((item) => item.kind === "shorts").length, 1)
+  for (const selector of [
+    "#movie_player",
+    "#chat",
+    "ytd-playlist-panel-renderer",
+    "ytd-search"
+  ])
+    assert.equal(
+      document
+        .querySelector(selector)!
+        .classList.contains("distraut-suggested-hidden"),
+      false
+    )
+  applyVideoFilters(document, { ...state, hideSuggested: false })
+  assert.equal(panel.classList.contains("distraut-suggested-hidden"), false)
+  assert.equal(
+    document
+      .querySelector(
+        "ytd-watch-next-secondary-results-renderer yt-lockup-view-model"
+      )!
+      .classList.contains("distraut-hidden"),
+    true
+  )
+  assert.equal(document.contains(panel), true)
+})
+
+test("sugeridos: concentración automática y restauración por pausa, descanso o fin respetan preferencia manual", () => {
+  const { document } = parseHTML(
+    `<ytd-watch-next-secondary-results-renderer>${lockup("React", "Canal")}</ytd-watch-next-secondary-results-renderer>`
+  )
+  const panel = document.querySelector(
+    "ytd-watch-next-secondary-results-renderer"
+  )!
+  const now = Date.now()
+  const state: StoredState = {
+    schemaVersion: 1,
+    enabled: false,
+    filters: [],
+    session: { startedAt: now - 60000, endsAt: now + 60000 }
+  }
+  applyVideoFilters(document, state)
+  assert.equal(panel.classList.contains("distraut-suggested-hidden"), true)
+  const sessions: StoredState["session"][] = [
+    undefined,
+    { ...state.session!, pausedAt: now },
+    { startedAt: now - 31 * 60000, endsAt: now + 34 * 60000, breaks: true },
+    { startedAt: now - 60000, endsAt: now - 1 }
+  ]
+  for (const session of sessions) {
+    applyVideoFilters(document, { ...state, session })
+    assert.equal(panel.classList.contains("distraut-suggested-hidden"), false)
+    applyVideoFilters(document, { ...state, session, hideSuggested: true })
+    assert.equal(panel.classList.contains("distraut-suggested-hidden"), true)
+  }
+  assert.equal(document.contains(panel), true)
+})
+
+test("sugeridos: panel tardío y navegación SPA se evalúan sin bucle por su clase", async () => {
+  const { document, window } = parseHTML("<main></main>")
+  let runs = 0
+  const stop = observeVideoChanges(document, () => {
+    runs++
+    applyVideoFilters(document, {
+      schemaVersion: 1,
+      enabled: false,
+      filters: [],
+      hideSuggested: true
+    })
+  })
+  document
+    .querySelector("main")!
+    .insertAdjacentHTML(
+      "beforeend",
+      `<ytd-watch-next-secondary-results-renderer>${lockup("React", "Canal")}</ytd-watch-next-secondary-results-renderer>`
+    )
+  await new Promise((resolve) => setTimeout(resolve, 15))
+  assert.equal(
+    document
+      .querySelector("ytd-watch-next-secondary-results-renderer")!
+      .classList.contains("distraut-suggested-hidden"),
+    true
+  )
+  assert.equal(runs, 1)
+  document.dispatchEvent(new window.Event("yt-navigate-finish"))
+  await new Promise((resolve) => setTimeout(resolve, 15))
+  assert.equal(runs, 2)
+  stop()
+})
+
 test("métrica devuelve tarjetas individuales, sin duplicar enlaces o secciones de Shorts", () => {
   const { document } = parseHTML(
     `<ytd-search><grid-shelf-view-model>${short}${short}</grid-shelf-view-model><ytd-video-renderer is-search>${lockup("React", "Canal")}</ytd-video-renderer></ytd-search>`

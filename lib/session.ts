@@ -2,6 +2,14 @@ import type { StoredState } from "../types/filter"
 
 const minute = 60000
 
+export function isConcentrating(
+  session: StoredState["session"],
+  now = Date.now()
+): boolean {
+  const timing = getSessionTiming(session, now)
+  return !!timing && !timing.finished && !timing.paused && !timing.resting
+}
+
 export function getSessionTiming(
   session: StoredState["session"],
   now = Date.now()

@@ -19,6 +19,7 @@ export interface StoredState {
   enabled: boolean
   filters: Filter[]
   hideShorts?: boolean
+  hideSuggested?: boolean
   statistics?: UsageStatistics
   collections?: FilterCollection[]
   session?: {

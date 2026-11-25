@@ -1,4 +1,5 @@
 .distraut-hidden,
-.distraut-shorts-hidden {
+.distraut-shorts-hidden,
+.distraut-suggested-hidden {
   display: none !important;
 }

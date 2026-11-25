@@ -16,6 +16,7 @@ import {
   setFilteringEnabled,
   setShortsHidden,
   setStudySessionPaused,
+  setSuggestedHidden,
   startStudySession,
   subscribeToStoredState,
   useUntimedFiltering
@@ -29,6 +30,21 @@ type Listener = (
   area: string
 ) => void
 let listeners: Set<Listener>
+
+test("sugeridos conserva preferencia manual, valida datos y propaga errores", async () => {
+  assert.equal((await getStoredState()).hideSuggested, undefined)
+  await setSuggestedHidden(true)
+  await startStudySession(30)
+  await setStudySessionPaused(true)
+  assert.equal((await endStudySession()).hideSuggested, true)
+  await setSuggestedHidden(false)
+  failWrite = true
+  await assert.rejects(setSuggestedHidden(true), /No se pudo guardar/)
+  const previous = await getStoredState()
+  assert.equal(previous.hideSuggested, false)
+  values.distrautState = { ...previous, hideSuggested: "sí" }
+  await assert.rejects(getStoredState(), /formato no compatible/)
+})
 
 test("reproducción de varias pestañas se suma sin pisar sesiones ni filtros", async () => {
   const start = Date.now() - 10000

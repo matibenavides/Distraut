@@ -29,6 +29,7 @@ function parseStoredState(stored: unknown): StoredState {
     !("enabled" in stored) ||
     typeof stored.enabled !== "boolean" ||
     ("hideShorts" in stored && typeof stored.hideShorts !== "boolean") ||
+    ("hideSuggested" in stored && typeof stored.hideSuggested !== "boolean") ||
     !("filters" in stored) ||
     !Array.isArray(stored.filters) ||
     !stored.filters.every(isFilter) ||
@@ -221,6 +222,12 @@ export async function setFilteringEnabled(
 
 export function setShortsHidden(hideShorts: boolean): Promise<StoredState> {
   return updateState((state) => ({ ...state, hideShorts }))
+}
+
+export function setSuggestedHidden(
+  hideSuggested: boolean
+): Promise<StoredState> {
+  return updateState((state) => ({ ...state, hideSuggested }))
 }
 
 export function recordHiddenCounts(videos: number, shorts: number) {

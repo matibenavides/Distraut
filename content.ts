@@ -70,9 +70,15 @@ function reportError(error: Error): void {
   clearTimeout(expiryTimer)
   console.error("Distraut: no se pudieron leer los filtros.", error)
   document
-    .querySelectorAll(".distraut-hidden, .distraut-shorts-hidden")
+    .querySelectorAll(
+      ".distraut-hidden, .distraut-shorts-hidden, .distraut-suggested-hidden"
+    )
     .forEach((card) => {
-      card.classList.remove("distraut-hidden", "distraut-shorts-hidden")
+      card.classList.remove(
+        "distraut-hidden",
+        "distraut-shorts-hidden",
+        "distraut-suggested-hidden"
+      )
     })
 }
 

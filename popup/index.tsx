@@ -1,7 +1,7 @@
 import { ConfigProvider, Switch, Tabs } from "antd"
 import { useEffect, useRef, useState } from "react"
 
-import { getSessionTiming } from "../lib/session"
+import { getSessionTiming, isConcentrating } from "../lib/session"
 import {
   addCollection,
   getStoredState,
@@ -9,6 +9,7 @@ import {
   setCollectionEnabled,
   setFilteringEnabled,
   setShortsHidden,
+  setSuggestedHidden,
   subscribeToStoredState,
   useUntimedFiltering
 } from "../lib/storage"
@@ -43,6 +44,7 @@ function IndexPopup() {
   }, [state?.session?.endsAt, tab])
   const timing = getSessionTiming(state?.session, now)
   const expired = !!timing?.finished
+  const suggestedBySession = isConcentrating(state?.session, now)
   const inCollection =
     view === "rules"
       ? state?.collections?.find((group) => group.id === origin)
@@ -273,6 +275,21 @@ function IndexPopup() {
               </div>
               <small id="shorts-help">
                 Independiente de los filtros y de la sesión de estudio.
+              </small>
+              <div className="filter-control row">
+                <label htmlFor="hide-suggested">Ocultar videos sugeridos</label>
+                <Switch
+                  id="hide-suggested"
+                  checked={!!state.hideSuggested || suggestedBySession}
+                  disabled={busy || suggestedBySession}
+                  aria-describedby="suggested-help"
+                  onChange={(hidden) => save(() => setSuggestedHidden(hidden))}
+                />
+              </div>
+              <small id="suggested-help">
+                {suggestedBySession
+                  ? "Activo por la sesión. Al pausar o finalizar se recupera tu selección independiente."
+                  : "Oculta el panel junto al reproductor. También se activa durante la concentración."}
               </small>
               <section>
                 <AddFilter state={state} save={save} />
