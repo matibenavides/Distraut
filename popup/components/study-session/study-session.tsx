@@ -113,7 +113,8 @@ export function StudySession({
           <label htmlFor="session-minutes">Minutos de concentración</label>
           <div className="duration-picker">
             <Button
-              aria-label="Restar 5 minutos"
+            style={{ paddingBottom: "4px", fontWeight: "bold" }}
+              aria-label="Restar 5 minutos" 
               disabled={minutes === null || minutes <= 5}
               onClick={() => setMinutes(Math.max(5, (minutes ?? 30) - 5))}>
               −
@@ -126,12 +127,14 @@ export function StudySession({
               precision={0}
               controls={false}
               value={minutes}
-              onChange={setMinutes}
+              onChange={(value) =>
+                setMinutes(value === null ? null : Number(value))
+              }
               suffix="min"
               aria-label="Minutos de concentración"
             />
             <Button
-              style={{ paddingBottom: "4px" }}
+              style={{ paddingBottom: "4px", fontWeight: "bold" }}
               aria-label="Sumar 5 minutos"
               disabled={minutes !== null && minutes >= 240}
               onClick={() => setMinutes(Math.min(240, (minutes ?? 30) + 5))}>
