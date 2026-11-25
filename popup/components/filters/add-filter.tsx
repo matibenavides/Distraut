@@ -1,87 +1,107 @@
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
-import { addFilter } from "../../../lib/storage"
+import { addFilter, removeFilter } from "../../../lib/storage"
 import type { FilterType, StoredState } from "../../../types/filter"
 import type { Save } from "../../types"
 
-export function AddFilter({
+function FilterGroup({
+  type,
   state,
-  save,
-  collectionId = ""
+  save
 }: {
+  type: FilterType
   state: StoredState
   save: Save
-  collectionId?: string
 }) {
-  const [type, setType] = useState<FilterType>("keyword")
   const [value, setValue] = useState("")
-  const [destination, setDestination] = useState(collectionId)
   const [message, setMessage] = useState("")
-  const groups = state.collections ?? []
-  const selected = groups.some((group) => group.id === destination)
-    ? destination
-    : ""
+  const input = useRef<HTMLInputElement>(null)
+  const keyword = type === "keyword"
+  const title = keyword ? "Ocultar palabra" : "Ocultar canal"
+  const rules = state.filters
+    .filter((rule) => rule.type === type && !rule.collectionId)
+    .reverse()
+
+  useEffect(() => {
+    if (message && input.current?.getClientRects().length) input.current.focus()
+  }, [message])
+
   return (
     <form
-      className="create-form"
+      className="filter-group"
+      data-type={type}
       onSubmit={async (e) => {
         e.preventDefault()
         setMessage("")
-        if (await save(() => addFilter(type, value, selected || undefined))) {
-          setMessage(`Filtro «${value.trim()}» guardado.`)
+        if (await save(() => addFilter(type, value))) {
+          setMessage(`«${value.trim()}» añadido.`)
           setValue("")
         }
       }}>
-      <h2>Ocultar palabras o canales</h2>
-      <label htmlFor="filter-type">Qué quieres ocultar</label>
-      <select
-        id="filter-type"
-        value={type}
-        onChange={(e) => {
-          setType(e.target.value as FilterType)
-          setMessage("")
-        }}>
-        <option value="keyword">Videos cuyo título contenga…</option>
-        <option value="channel">Videos de este canal…</option>
-      </select>
-      <label htmlFor="new-rule">
-        {type === "keyword"
-          ? "Palabra o frase del título"
-          : "Nombre completo del canal"}
+      <label className="filter-group-title" htmlFor={`new-${type}`}>
+        {title}
+        <span className="filter-count">{rules.length}</span>
       </label>
-      <input
-        id="new-rule"
-        required
-        placeholder={
-          type === "keyword" ? "Ej. Minecraft" : "Ej. Luisito Comunica"
-        }
-        value={value}
-        onChange={(e) => {
-          setValue(e.target.value)
-          setMessage("")
-        }}
-      />
-      <div className="destination-row">
-        <div>
-          <label htmlFor="destination">Guardar en</label>
-          <select
-            id="destination"
-            value={selected}
-            onChange={(e) => setDestination(e.target.value)}>
-            <option value="">Filtros individuales</option>
-            {groups.map((group) => (
-              <option key={group.id} value={group.id}>
-                {group.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <button className="primary">Añadir filtro</button>
+      <div className="filter-entry">
+        <input
+          ref={input}
+          id={`new-${type}`}
+          required
+          value={value}
+          placeholder={
+            keyword ? "Palabra o frase del título" : "Nombre completo del canal"
+          }
+          onChange={(e) => {
+            setValue(e.target.value)
+            setMessage("")
+          }}
+        />
+        <button
+          className="primary"
+          aria-label={keyword ? "Añadir palabra clave" : "Añadir canal"}>
+          <span aria-hidden="true">+</span>
+        </button>
       </div>
+      {!!rules.length && (
+        <ul className="filter-chips" aria-label={`${title} individuales`}>
+          {rules.map((rule) => (
+            <li
+              key={rule.id}
+              className="filter-chip"
+              data-enabled={rule.enabled}>
+              <span>
+                {rule.value}
+                {!rule.enabled && (
+                  <span className="chip-paused"> · en pausa</span>
+                )}
+              </span>
+              <button
+                type="button"
+                aria-label={`Quitar ${keyword ? "palabra clave" : "canal"} ${rule.value}`}
+                onClick={async () => {
+                  setMessage("")
+                  if (await save(() => removeFilter(rule.id)))
+                    setMessage(`«${rule.value}» eliminado.`)
+                }}>
+                <span aria-hidden="true">×</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
       <small className="feedback" role="status">
-        {message ||
-          "Se aplica en YouTube al guardarlo si el filtrado está activo."}
+        {message}
       </small>
     </form>
+  )
+}
+
+export function AddFilter({ state, save }: { state: StoredState; save: Save }) {
+  return (
+    <div className="filter-composer">
+      <p className="filter-intro">Filtros individuales. Añade con Enter o +.</p>
+      <FilterGroup type="keyword" state={state} save={save} />
+      <FilterGroup type="channel" state={state} save={save} />
+    </div>
   )
 }

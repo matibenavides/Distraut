@@ -4,7 +4,6 @@ import { normalizeFilterValue } from "../../../lib/filters"
 import { removeFilter, setFilterEnabled } from "../../../lib/storage"
 import type { FilterType, StoredState } from "../../../types/filter"
 import type { Save } from "../../types"
-import { AddFilter } from "./add-filter"
 
 const pageSize = 4
 const individual = "individual"
@@ -39,113 +38,108 @@ export function RuleLibrary({
   const current = Math.min(page, last)
   const start = current * pageSize
   return (
-    <>
-      <AddFilter state={state} save={save} collectionId={initialOrigin} />
-      <section>
-        <h2>
-          {initialOrigin ? "Filtros de esta colección" : "Filtros guardados"}
-        </h2>
-        {!initialOrigin && (
-          <>
-            <label htmlFor="origin">Mostrar filtros de</label>
-            <select
-              id="origin"
-              value={effectiveOrigin}
-              onChange={(e) => {
-                setOrigin(e.target.value)
+    <section>
+      <h2>
+        {initialOrigin ? "Filtros de esta colección" : "Filtros guardados"}
+      </h2>
+      {!initialOrigin && (
+        <>
+          <label htmlFor="origin">Mostrar filtros de</label>
+          <select
+            id="origin"
+            value={effectiveOrigin}
+            onChange={(e) => {
+              setOrigin(e.target.value)
+              setPage(0)
+            }}>
+            <option value="">Todas las colecciones e individuales</option>
+            <option value={individual}>Filtros individuales</option>
+            {groups.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name}
+              </option>
+            ))}
+          </select>
+        </>
+      )}
+      <label htmlFor="saved-search">Buscar entre los filtros guardados</label>
+      <input
+        id="saved-search"
+        type="search"
+        value={query}
+        onChange={(e) => {
+          setQuery(e.target.value)
+          setPage(0)
+        }}
+        placeholder="Escribe para encontrar un filtro existente…"
+      />
+      <div className="row library-tools">
+        <div className="types" role="group" aria-label="Tipo de regla">
+          {(["keyword", "channel"] as const).map((kind) => (
+            <button
+              key={kind}
+              aria-pressed={kind === type}
+              onClick={() => {
+                setType(kind)
                 setPage(0)
               }}>
-              <option value="">Todas las colecciones e individuales</option>
-              <option value={individual}>Filtros individuales</option>
-              {groups.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.name}
-                </option>
-              ))}
-            </select>
-          </>
-        )}
-        <label htmlFor="saved-search">Buscar entre los filtros guardados</label>
-        <input
-          id="saved-search"
-          type="search"
-          value={query}
-          onChange={(e) => {
-            setQuery(e.target.value)
-            setPage(0)
-          }}
-          placeholder="Escribe para encontrar un filtro existente…"
-        />
-        <div className="row library-tools">
-          <div className="types" role="group" aria-label="Tipo de regla">
-            {(["keyword", "channel"] as const).map((kind) => (
-              <button
-                key={kind}
-                aria-pressed={kind === type}
-                onClick={() => {
-                  setType(kind)
-                  setPage(0)
-                }}>
-                {kind === "keyword" ? "Títulos" : "Canales"} ·{" "}
-                {inOrigin.filter((r) => r.type === kind).length}
-              </button>
-            ))}
-          </div>
+              {kind === "keyword" ? "Títulos" : "Canales"} ·{" "}
+              {inOrigin.filter((r) => r.type === kind).length}
+            </button>
+          ))}
         </div>
-        <ul className="rules">
-          {results.slice(start, start + pageSize).map((rule) => {
-            const group = groups.find((g) => g.id === rule.collectionId)
-            return (
-              <li key={rule.id} className="row">
-                <div className="rule-name">
-                  <strong>{rule.value}</strong>
-                  <small>
-                    {group?.name ?? "Individual"}
-                    {group && !group.enabled && " · En pausa"}
-                  </small>
-                </div>
-                <button
-                  aria-label={`${rule.enabled ? "Pausar" : "Reanudar"} ${rule.value}`}
-                  onClick={() =>
-                    save(() => setFilterEnabled(rule.id, !rule.enabled))
-                  }>
-                  {rule.enabled ? "Pausar" : "Reanudar"}
-                </button>
-                <button
-                  aria-label={`Quitar ${rule.value} de ${group?.name ?? "Individuales"}`}
-                  onClick={() => save(() => removeFilter(rule.id))}>
-                  Quitar
-                </button>
-              </li>
-            )
-          })}
-        </ul>
-        {!results.length && (
-          <p role="status">
-            {query
-              ? "No se encontraron filtros guardados con ese texto."
-              : "Todavía no guardaste filtros de este tipo."}
-          </p>
-        )}
-        {!!results.length && (
-          <nav className="row pager" aria-label="Páginas de filtros">
-            <small aria-live="polite">
-              {start + 1}–{Math.min(start + pageSize, results.length)} de{" "}
-              {results.length}
-            </small>
-            <button
-              disabled={current === 0}
-              onClick={() => setPage(current - 1)}>
-              Anterior
-            </button>
-            <button
-              disabled={current === last}
-              onClick={() => setPage(current + 1)}>
-              Siguiente ›
-            </button>
-          </nav>
-        )}
-      </section>
-    </>
+      </div>
+      <ul className="rules">
+        {results.slice(start, start + pageSize).map((rule) => {
+          const group = groups.find((g) => g.id === rule.collectionId)
+          return (
+            <li key={rule.id} className="row">
+              <div className="rule-name">
+                <strong>{rule.value}</strong>
+                <small>
+                  {group?.name ?? "Individual"}
+                  {group && !group.enabled && " · En pausa"}
+                </small>
+              </div>
+              <button
+                aria-label={`${rule.enabled ? "Pausar" : "Reanudar"} ${rule.value}`}
+                onClick={() =>
+                  save(() => setFilterEnabled(rule.id, !rule.enabled))
+                }>
+                {rule.enabled ? "Pausar" : "Reanudar"}
+              </button>
+              <button
+                aria-label={`Quitar ${rule.value} de ${group?.name ?? "Individuales"}`}
+                onClick={() => save(() => removeFilter(rule.id))}>
+                Quitar
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+      {!results.length && (
+        <p role="status">
+          {query
+            ? "No se encontraron filtros guardados con ese texto."
+            : "Todavía no guardaste filtros de este tipo."}
+        </p>
+      )}
+      {!!results.length && (
+        <nav className="row pager" aria-label="Páginas de filtros">
+          <small aria-live="polite">
+            {start + 1}–{Math.min(start + pageSize, results.length)} de{" "}
+            {results.length}
+          </small>
+          <button disabled={current === 0} onClick={() => setPage(current - 1)}>
+            Anterior
+          </button>
+          <button
+            disabled={current === last}
+            onClick={() => setPage(current + 1)}>
+            Siguiente ›
+          </button>
+        </nav>
+      )}
+    </section>
   )
 }

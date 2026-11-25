@@ -315,8 +315,14 @@ function IndexPopup() {
         <fieldset disabled={busy} aria-busy={busy}>
           {view === "home" && (
             <>
-              <section>
+              <section aria-labelledby="hidden-filters-title">
+                <h2 id="hidden-filters-title">Palabras y canales ocultos</h2>
                 <AddFilter state={state} save={save} />
+                <button
+                  className="filter-library-link"
+                  onClick={() => openRules()}>
+                  Ver todos y gestionar ({state.filters.length}) ›
+                </button>
               </section>
               <section>
                 <div className="row">
@@ -332,15 +338,6 @@ function IndexPopup() {
                 ) : (
                   <p>Agrupa palabras y canales para pausarlos juntos.</p>
                 )}
-              </section>
-              <section className="row">
-                <div>
-                  <h2>Palabras y canales ocultos</h2>
-                  <p>{state.filters.length} filtros guardados</p>
-                </div>
-                <button className="primary" onClick={() => openRules()}>
-                  Ver y editar ›
-                </button>
               </section>
             </>
           )}
