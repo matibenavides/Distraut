@@ -1,4 +1,12 @@
-import type { Filter, FilterType } from "../types/filter"
+import type { Filter, FilterCollection, FilterType } from "../types/filter"
+
+export const MAX_COLLECTION_NAME_LENGTH = 24
+
+export function orderedCollections(
+  collections: readonly FilterCollection[] = []
+) {
+  return [...collections].reverse()
+}
 
 export function normalizeFilterValue(value: string): string {
   return value

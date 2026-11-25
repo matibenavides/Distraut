@@ -1,6 +1,7 @@
 import CheckOutlined from "@ant-design/icons/es/icons/CheckOutlined"
+import CloseOutlined from "@ant-design/icons/es/icons/CloseOutlined"
+import FolderAddOutlined from "@ant-design/icons/es/icons/FolderAddOutlined"
 import FolderOutlined from "@ant-design/icons/es/icons/FolderOutlined"
-import PlusOutlined from "@ant-design/icons/es/icons/PlusOutlined"
 import { Button, Tabs } from "antd"
 import {
   useEffect,
@@ -11,12 +12,18 @@ import {
 } from "react"
 
 import {
+  MAX_COLLECTION_NAME_LENGTH,
+  orderedCollections
+} from "../../../lib/filters"
+import {
   addCollection,
   addFilter,
   moveFiltersToCollection,
-  removeFilter
+  removeFilter,
+  swapCollections
 } from "../../../lib/storage"
 import type {
+  Filter,
   FilterCollection,
   FilterType,
   StoredState
@@ -24,6 +31,7 @@ import type {
 import type { Save } from "../../types"
 
 const dragType = "application/x-distraut-filters"
+const folderDragType = "application/x-distraut-collection"
 
 function FilterGroup({
   type,
@@ -34,17 +42,19 @@ function FilterGroup({
   startDrag,
   endDrag,
   dropTarget,
+  createWithSelection,
   busy
 }: {
   type: FilterType
   state: StoredState
   save: Save
-  selected: string[]
-  toggle: (id: string) => void
-  startDrag: (event: DragEvent, id: string) => void
+  selected: ReadonlySet<string>
+  toggle: (rule: Filter) => void
+  startDrag: (event: DragEvent, rule: Filter) => void
   endDrag: () => void
+  createWithSelection: (name: string) => Promise<boolean>
   dropTarget: (
-    group: FilterCollection,
+    group: FilterCollection | undefined,
     surface: FilterType
   ) => HTMLAttributes<HTMLElement>
   busy: boolean
@@ -55,8 +65,13 @@ function FilterGroup({
   const keyword = type === "keyword"
   const title = keyword ? "Ocultar palabra" : "Ocultar canal"
   const [activeGroup, setActiveGroup] = useState("")
+  const [collectionName, setCollectionName] = useState<string | null>(null)
+  const collectionTrigger = useRef<HTMLButtonElement>(null)
+  const editingCollection = collectionName !== null
   const byCollection = new Map<string, StoredState["filters"]>()
+  const occupied = new Set<string>()
   for (const rule of state.filters) {
+    if (rule.collectionId) occupied.add(rule.collectionId)
     if (rule.type !== type) continue
     const id = rule.collectionId ?? ""
     const entries = byCollection.get(id)
@@ -64,48 +79,58 @@ function FilterGroup({
     else byCollection.set(id, [rule])
   }
   const rules = (byCollection.get("") ?? []).reverse()
-  const groups = (state.collections ?? []).filter((group) =>
-    byCollection.has(group.id)
+  const groups = orderedCollections(state.collections).filter(
+    (group) => byCollection.has(group.id) || !occupied.has(group.id)
   )
 
   useEffect(() => {
     if (message && input.current?.getClientRects().length) input.current.focus()
   }, [message])
 
+  function removeButton(rule: Filter, collectionName?: string) {
+    const origin = collectionName ? ` de la colección ${collectionName}` : ""
+    return (
+      <button
+        type="button"
+        aria-label={`Quitar ${keyword ? "palabra clave" : "canal"} ${rule.value}${origin}`}
+        onClick={async () => {
+          setMessage("")
+          if (await save(() => removeFilter(rule.id)))
+            setMessage(`Se eliminó «${rule.value}»${origin}.`)
+        }}>
+        <span aria-hidden="true">×</span>
+      </button>
+    )
+  }
+
+  function renderChip(rule: Filter, group?: FilterCollection) {
+    return (
+      <li
+        key={rule.id}
+        className="filter-chip"
+        data-selected={selected.has(rule.id)}
+        data-enabled={rule.enabled}>
+        <button
+          type="button"
+          className="select-chip"
+          draggable={!busy}
+          onDragStart={(e) => startDrag(e, rule)}
+          onDragEnd={endDrag}
+          onClick={() => toggle(rule)}
+          aria-pressed={selected.has(rule.id)}>
+          {selected.has(rule.id) && <CheckOutlined aria-hidden="true" />}
+          {rule.value}
+          {!rule.enabled && <span className="chip-paused"> · en pausa</span>}
+        </button>
+        {removeButton(rule, group?.name)}
+      </li>
+    )
+  }
   const individualChips = rules.length > 0 && (
     <ul
       className="filter-chips"
       aria-label={keyword ? "Palabras individuales" : "Canales individuales"}>
-      {rules.map((rule) => (
-        <li
-          key={rule.id}
-          className="filter-chip"
-          data-selected={selected.includes(rule.id)}
-          data-enabled={rule.enabled}>
-          <button
-            type="button"
-            className="select-chip"
-            draggable={!busy}
-            onDragStart={(e) => startDrag(e, rule.id)}
-            onDragEnd={endDrag}
-            onClick={() => toggle(rule.id)}
-            aria-pressed={selected.includes(rule.id)}>
-            {selected.includes(rule.id) && <CheckOutlined aria-hidden="true" />}
-            {rule.value}
-            {!rule.enabled && <span className="chip-paused"> · en pausa</span>}
-          </button>
-          <button
-            type="button"
-            aria-label={`Quitar ${keyword ? "palabra clave" : "canal"} ${rule.value}`}
-            onClick={async () => {
-              setMessage("")
-              if (await save(() => removeFilter(rule.id)))
-                setMessage(`«${rule.value}» eliminado.`)
-            }}>
-            <span aria-hidden="true">×</span>
-          </button>
-        </li>
-      ))}
+      {rules.map((rule) => renderChip(rule))}
     </ul>
   )
 
@@ -147,62 +172,143 @@ function FilterGroup({
           </button>
         </div>
       </form>
-      {groups.length ? (
-        <Tabs
-          className="chip-tabs"
-          size="small"
-          tabBarGutter={14}
-          aria-label={
-            keyword ? "Palabras por colección" : "Canales por colección"
-          }
-          activeKey={
-            groups.some((group) => group.id === activeGroup) ? activeGroup : ""
-          }
-          onChange={setActiveGroup}
-          items={[
-            {
-              key: "",
-              label: "Individuales",
-              children: individualChips || (
-                <small>Sin filtros individuales.</small>
-              )
-            },
-            ...groups.map((group) => ({
-              key: group.id,
-              label: (
-                <span
-                  className="chip-tab-name"
-                  title={group.name}
-                  {...dropTarget(group, type)}>
-                  <FolderOutlined aria-hidden="true" /> {group.name}
-                </span>
-              ),
-              children: (
-                <>
-                  {!group.enabled && <small>Colección en pausa</small>}
+      <Tabs
+        className="chip-tabs"
+        size="small"
+        tabBarGutter={14}
+        tabBarExtraContent={
+          <Button
+            ref={collectionTrigger}
+            className="new-collection-trigger"
+            size="small"
+            type="text"
+            disabled={busy}
+            icon={editingCollection ? <CloseOutlined /> : <FolderAddOutlined />}
+            aria-expanded={editingCollection}
+            aria-controls={
+              editingCollection ? `collection-editor-${type}` : undefined
+            }
+            aria-label={
+              editingCollection ? "Cerrar nueva colección" : "Nueva colección"
+            }
+            title={editingCollection ? "Cerrar" : "Nueva colección"}
+            onClick={() => {
+              setMessage("")
+              setCollectionName(editingCollection ? null : "")
+            }}>
+            {editingCollection ? "Cerrar" : "Nueva"}
+          </Button>
+        }
+        renderTabBar={(props, TabBar) => (
+          <>
+            <TabBar {...props} />
+            {editingCollection && (
+              <form
+                className="collection-tab-form"
+                id={`collection-editor-${type}`}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") {
+                    event.preventDefault()
+                    setCollectionName(null)
+                    collectionTrigger.current?.focus()
+                  }
+                }}
+                onSubmit={async (event) => {
+                  event.preventDefault()
+                  if (await save(() => addCollection(collectionName))) {
+                    setCollectionName(null)
+                    setMessage(`Colección «${collectionName.trim()}» creada.`)
+                  }
+                }}>
+                <input
+                  autoFocus
+                  required
+                  aria-label="Nombre de la nueva colección"
+                  placeholder={`Nombre (máx. ${MAX_COLLECTION_NAME_LENGTH})`}
+                  title={`Máximo ${MAX_COLLECTION_NAME_LENGTH} caracteres`}
+                  maxLength={MAX_COLLECTION_NAME_LENGTH}
+                  value={collectionName}
+                  onChange={(event) => {
+                    setCollectionName(event.target.value)
+                    setMessage("")
+                  }}
+                />
+                <Button
+                  size="small"
+                  htmlType="submit"
+                  type="primary"
+                  aria-label="Crear colección"
+                  title="Crear colección"
+                  disabled={busy}>
+                  Crear
+                </Button>
+                {selected.size > 0 && collectionName.trim() && (
+                  <Button
+                    size="small"
+                    disabled={busy}
+                    onClick={async () => {
+                      if (await createWithSelection(collectionName))
+                        setCollectionName(null)
+                    }}>
+                    Crear y mover
+                  </Button>
+                )}
+              </form>
+            )}
+          </>
+        )}
+        aria-label={
+          keyword ? "Palabras por colección" : "Canales por colección"
+        }
+        activeKey={
+          groups.some((group) => group.id === activeGroup) ? activeGroup : ""
+        }
+        onChange={setActiveGroup}
+        items={[
+          {
+            key: "",
+            label: (
+              <span className="chip-tab-name" {...dropTarget(undefined, type)}>
+                Individuales
+              </span>
+            ),
+            children: individualChips || (
+              <small>Sin filtros individuales.</small>
+            )
+          },
+          ...groups.map((group) => ({
+            key: group.id,
+            label: (
+              <span
+                className="chip-tab-name"
+                title={group.name}
+                {...dropTarget(group, type)}>
+                <FolderOutlined aria-hidden="true" /> {group.name}
+              </span>
+            ),
+            children: (
+              <>
+                {!group.enabled && <small>Colección en pausa</small>}
+                {byCollection.has(group.id) ? (
                   <ul
                     className="filter-chips collection-chips"
                     aria-label={`${keyword ? "Palabras" : "Canales"} de ${group.name}`}>
-                    {byCollection.get(group.id)!.map((rule) => (
-                      <li
-                        key={rule.id}
-                        className="filter-chip"
-                        data-enabled={rule.enabled}>
-                        <span>
-                          {rule.value}
-                          {!rule.enabled && " · en pausa"}
-                        </span>
-                      </li>
-                    ))}
+                    {byCollection
+                      .get(group.id)!
+                      .map((rule) => renderChip(rule, group))}
                   </ul>
-                </>
-              )
-            }))
-          ]}
-        />
-      ) : (
-        individualChips
-      )}
+                ) : (
+                  <small>
+                    {keyword
+                      ? "Sin palabras en esta colección."
+                      : "Sin canales en esta colección."}
+                  </small>
+                )}
+              </>
+            )
+          }))
+        ]}
+      />
       <small className="feedback" role="status">
         {message}
       </small>
@@ -219,76 +325,109 @@ export function AddFilter({
   save: Save
   busy: boolean
 }) {
-  const [marked, setMarked] = useState<string[]>([])
+  const [marked, setMarked] = useState<Filter[]>([])
   const [over, setOver] = useState("")
-  const [creating, setCreating] = useState(false)
-  const [name, setName] = useState("")
   const [notice, setNotice] = useState("")
-  const [dragged, setDragged] = useState<string[]>([])
+  const [dragged, setDragged] = useState<Filter[]>([])
+  const [draggedFolder, setDraggedFolder] = useState<string>()
   const composer = useRef<HTMLDivElement>(null)
-  const selected = state.filters
-    .filter((rule) => !rule.collectionId && marked.includes(rule.id))
-    .map((rule) => rule.id)
+  const origins = new Map(marked.map((rule) => [rule.id, rule.collectionId]))
+  const selected = state.filters.filter(
+    (rule) => origins.has(rule.id) && origins.get(rule.id) === rule.collectionId
+  )
+  const selectedIds = new Set(selected.map((rule) => rule.id))
+  const destinations: (FilterCollection | undefined)[] = orderedCollections(
+    state.collections
+  )
+  if (selected.some((rule) => rule.collectionId !== undefined))
+    destinations.unshift(undefined)
 
   useEffect(() => {
     if (notice && composer.current?.getClientRects().length)
       composer.current.querySelector("input")?.focus()
   }, [notice])
 
-  function toggle(id: string) {
+  function toggle(rule: Filter) {
     setNotice("")
     setMarked(
-      selected.includes(id)
-        ? selected.filter((item) => item !== id)
-        : [...selected, id]
+      selectedIds.has(rule.id)
+        ? selected.filter((item) => item.id !== rule.id)
+        : [...selected, rule]
     )
   }
-  function startDrag(e: DragEvent, id: string) {
+  function startDrag(e: DragEvent, rule: Filter) {
     if (busy) {
       e.preventDefault()
       return
     }
-    const ids = selected.includes(id) ? selected : [...selected, id]
-    setDragged(ids)
+    const batch = selectedIds.has(rule.id) ? selected : [...selected, rule]
+    setDragged(batch)
     e.dataTransfer.effectAllowed = "move"
     e.dataTransfer.setData(dragType, "selection")
-    setMarked(ids)
+    setMarked(batch)
     setNotice("")
   }
   function endDrag() {
     setDragged([])
+    setDraggedFolder(undefined)
     setOver("")
   }
   async function transfer(
-    ids: string[],
-    destination: string,
-    groupId?: string
+    batch: Filter[],
+    destination: FilterCollection | string | undefined
   ) {
-    if (busy || !ids.length) return
+    if (busy || !batch.length) return false
+    const newCollection = typeof destination === "string"
+    if (
+      !newCollection &&
+      batch.every((rule) => rule.collectionId === destination?.id)
+    )
+      return false
     if (
       await save(() =>
-        groupId
-          ? moveFiltersToCollection(ids, groupId)
-          : addCollection(destination, ids)
+        newCollection
+          ? addCollection(destination, batch)
+          : moveFiltersToCollection(batch, destination?.id)
       )
     ) {
       setMarked([])
-      setCreating(false)
-      setName("")
       setNotice(
-        `${ids.length === 1 ? "1 filtro en" : ids.length + " filtros en"} «${destination.trim()}».`
+        `${batch.length === 1 ? "1 filtro en" : batch.length + " filtros en"} «${newCollection ? destination.trim() : destination?.name ?? "Individuales"}».`
       )
+      return true
     }
+    return false
   }
-  function dropTarget(group: FilterCollection, surface: FilterType | "panel") {
-    const target = `${surface}:${group.id}`
+  function dropTarget(
+    group: FilterCollection | undefined,
+    surface: FilterType | "panel"
+  ) {
+    const target = `${surface}:${group?.id ?? ""}`
+    const folderTab = !!group && surface !== "panel"
     function accepts(e: DragEvent) {
+      if (busy) return false
+      if (draggedFolder)
+        return (
+          folderTab &&
+          group.id !== draggedFolder &&
+          e.dataTransfer.types.includes(folderDragType)
+        )
       return (
-        !busy && dragged.length > 0 && e.dataTransfer.types.includes(dragType)
+        dragged.some((rule) => rule.collectionId !== group?.id) &&
+        e.dataTransfer.types.includes(dragType)
       )
     }
     return {
+      draggable: folderTab && !busy,
+      onDragStart(e: DragEvent) {
+        if (!folderTab || busy) return
+        e.dataTransfer.setData(folderDragType, group.id)
+        e.dataTransfer.effectAllowed = "move"
+        setDraggedFolder(group.id)
+      },
+      onDragEnd: endDrag,
       "data-over": over === target,
+      "data-reorder": !!draggedFolder && over === target,
       onDragOver(e: DragEvent) {
         if (!accepts(e)) return
         e.preventDefault()
@@ -307,7 +446,11 @@ export function AddFilter({
         if (!accepts(e)) return
         e.preventDefault()
         endDrag()
-        void transfer(dragged, group.name, group.id)
+        if (draggedFolder && group) {
+          void save(() => swapCollections(draggedFolder, group.id))
+        } else {
+          void transfer(dragged, group)
+        }
       }
     }
   }
@@ -315,16 +458,19 @@ export function AddFilter({
     state,
     save,
     busy,
-    selected,
+    selected: selectedIds,
     toggle,
     startDrag,
     endDrag,
-    dropTarget
+    dropTarget,
+    createWithSelection: (name: string) => transfer(selected, name)
   }
   return (
     <div className="filter-composer" ref={composer}>
       <p className="filter-intro">
-        Selecciona o arrastra etiquetas para agruparlas.
+        Selecciona o arrastra etiquetas para moverlas.{" "}
+        {(state.collections?.length ?? 0) > 1 &&
+          "Arrastra una carpeta sobre otra para intercambiar su posición."}
       </p>
       <FilterGroup type="keyword" {...controls} />
       <FilterGroup type="channel" {...controls} />
@@ -339,62 +485,40 @@ export function AddFilter({
             <button
               type="button"
               onClick={() => {
-                composer.current
-                  ?.querySelector<HTMLButtonElement>(
+                const visible = Array.from(
+                  composer.current?.querySelectorAll<HTMLButtonElement>(
                     '.select-chip[aria-pressed="true"]'
-                  )
-                  ?.focus()
+                  ) ?? []
+                ).find((button) => button.getClientRects().length)
+                const focusTarget =
+                  visible ?? composer.current?.querySelector("input")
+                focusTarget?.focus()
                 setMarked([])
-                setCreating(false)
               }}>
               Cancelar
             </button>
           </div>
           <small>
             {state.collections?.length
-              ? "Suelta la selección o pulsa una colección."
+              ? "Suelta la selección o pulsa su destino."
               : "Crea una colección para esta selección."}
           </small>
           <div className="move-targets">
-            {state.collections?.map((group) => (
+            {destinations.map((group) => (
               <Button
-                key={group.id}
-                icon={<FolderOutlined />}
-                disabled={busy}
+                key={group?.id ?? ""}
+                icon={group && <FolderOutlined />}
+                disabled={
+                  busy ||
+                  selected.every((rule) => rule.collectionId === group?.id)
+                }
                 {...dropTarget(group, "panel")}
-                onClick={() => void transfer(selected, group.name, group.id)}>
-                {group.name}
-                {!group.enabled && " · pausada"}
+                onClick={() => void transfer(selected, group)}>
+                {group?.name ?? "Individuales"}
+                {group?.enabled === false && " · pausada"}
               </Button>
             ))}
           </div>
-          {creating ? (
-            <form
-              onSubmit={(e) => {
-                e.preventDefault()
-                void transfer(selected, name)
-              }}>
-              <input
-                aria-label="Nombre de la nueva colección"
-                placeholder="Nombre de la colección"
-                autoFocus
-                required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-              <Button htmlType="submit" type="primary" disabled={busy}>
-                Crear y mover
-              </Button>
-            </form>
-          ) : (
-            <Button
-              type="link"
-              icon={<PlusOutlined />}
-              disabled={busy}
-              onClick={() => setCreating(true)}>
-              Nueva colección
-            </Button>
-          )}
         </div>
       )}
       <small className="feedback" role="status">

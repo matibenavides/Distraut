@@ -4,7 +4,11 @@ import type {
   FilterType,
   StoredState
 } from "../types/filter"
-import { createFilter, normalizeFilterValue } from "./filters"
+import {
+  createFilter,
+  MAX_COLLECTION_NAME_LENGTH,
+  normalizeFilterValue
+} from "./filters"
 import { addPlaybackInterval, settleStudyTime } from "./statistics"
 
 const STORAGE_KEY = "distrautState"
@@ -343,59 +347,91 @@ function requireCollection(state: StoredState, id: string) {
   return group
 }
 
-function assignIndividualFilters(
+// Un ID sin origen representa un filtro individual.
+type FilterSelection = readonly (string | Pick<Filter, "id" | "collectionId">)[]
+
+function assignFilters(
   state: StoredState,
-  ids: readonly string[],
-  group: FilterCollection
+  selection: FilterSelection,
+  group?: FilterCollection
 ) {
-  const selected = new Set(ids)
+  const selected = new Map<string, string | undefined>()
+  for (const entry of selection) {
+    if (typeof entry === "string") selected.set(entry, undefined)
+    else selected.set(entry.id, entry.collectionId)
+  }
   const rules = state.filters.filter((rule) => selected.has(rule.id))
   if (
     !selected.size ||
     rules.length !== selected.size ||
-    rules.some((rule) => rule.collectionId !== undefined)
+    rules.some((rule) => rule.collectionId !== selected.get(rule.id))
   )
-    throw new Error("La selección cambió. Revisa los filtros individuales.")
+    throw new Error("La selección cambió. Revisa los filtros seleccionados.")
 
   const key = (rule: Filter) =>
     rule.type + ":" + normalizeFilterValue(rule.value)
   const existing = new Set(
-    state.filters.filter((rule) => rule.collectionId === group.id).map(key)
+    state.filters.filter((rule) => rule.collectionId === group?.id).map(key)
   )
   for (const rule of rules) {
+    if (rule.collectionId === group?.id) continue
     if (existing.has(key(rule)))
       throw new Error(
-        `«${rule.value}» ya existe en «${group.name}». Quita ese filtro de la selección y vuelve a intentarlo.`
+        `El filtro «${rule.value}» ya existe en el destino o se repite en la selección. Revisa la selección para moverla a «${group?.name ?? "Individuales"}».`
       )
     existing.add(key(rule))
   }
   return {
     ...state,
-    filters: state.filters.map((rule) =>
-      selected.has(rule.id) ? { ...rule, collectionId: group.id } : rule
-    )
+    filters: state.filters.map((rule) => {
+      if (!selected.has(rule.id) || rule.collectionId === group?.id) return rule
+      if (group) return { ...rule, collectionId: group.id }
+      const { collectionId, ...individual } = rule
+      return individual
+    })
   }
 }
 
 export function moveFiltersToCollection(
-  ids: readonly string[],
-  groupId: string
+  selection: FilterSelection,
+  groupId?: string
 ) {
   return updateState((state) =>
-    assignIndividualFilters(state, ids, requireCollection(state, groupId))
+    assignFilters(
+      state,
+      selection,
+      groupId === undefined ? undefined : requireCollection(state, groupId)
+    )
   )
 }
 
-export function addCollection(name: string, filterIds?: readonly string[]) {
+export function addCollection(name: string, selection?: FilterSelection) {
   return updateState((state) => {
     const groups = state.collections ?? []
     const normalized = normalizeFilterValue(name)
     if (!normalized) throw new Error("Escribe un nombre para la colección.")
+    if (name.trim().length > MAX_COLLECTION_NAME_LENGTH)
+      throw new Error(
+        `El nombre de la colección admite hasta ${MAX_COLLECTION_NAME_LENGTH} caracteres.`
+      )
     if (groups.some((group) => normalizeFilterValue(group.name) === normalized))
       throw new Error("Ya existe una colección con ese nombre.")
     const group = { id: crypto.randomUUID(), name: name.trim(), enabled: true }
     const next = { ...state, collections: [...groups, group] }
-    return filterIds ? assignIndividualFilters(next, filterIds, group) : next
+    return selection ? assignFilters(next, selection, group) : next
+  })
+}
+
+export function swapCollections(sourceId: string, targetId: string) {
+  return updateState((state) => {
+    const source = requireCollection(state, sourceId)
+    const target = requireCollection(state, targetId)
+    const collections = [...state.collections!]
+    const from = collections.indexOf(source)
+    const to = collections.indexOf(target)
+    collections[from] = target
+    collections[to] = source
+    return { ...state, collections }
   })
 }
 

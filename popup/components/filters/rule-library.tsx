@@ -1,6 +1,6 @@
 import { useState } from "react"
 
-import { normalizeFilterValue } from "../../../lib/filters"
+import { normalizeFilterValue, orderedCollections } from "../../../lib/filters"
 import { removeFilter, setFilterEnabled } from "../../../lib/storage"
 import type { FilterType, StoredState } from "../../../types/filter"
 import type { Save } from "../../types"
@@ -21,7 +21,7 @@ export function RuleLibrary({
   const [type, setType] = useState<FilterType>("keyword")
   const [query, setQuery] = useState("")
   const [page, setPage] = useState(0)
-  const groups = state.collections ?? []
+  const groups = orderedCollections(state.collections)
   const effectiveOrigin =
     initialOrigin ||
     (origin === individual || groups.some((g) => g.id === origin) ? origin : "")

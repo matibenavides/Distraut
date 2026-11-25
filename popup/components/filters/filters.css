@@ -210,8 +210,41 @@
 .chip-tab-name[data-over="true"] {
   outline-offset: -2px;
 }
-.move-panel form {
+.chip-tab-name[draggable="true"] {
+  cursor: grab;
+}
+.chip-tab-name[data-reorder="true"] {
+  color: #59378b;
+  background: #ede5f5;
+  outline-color: #624096;
+}
+.collection-tab-form {
   display: flex;
   gap: 6px;
   align-items: center;
+  margin: 4px 0 6px;
+  padding: 7px 8px;
+  background: #f2edf7;
+  border-radius: 8px;
+}
+.collection-tab-form input {
+  flex: 1;
+  padding: 5px 8px;
+  font-size: 13px;
+}
+.collection-tab-form input::placeholder {
+  color: #625a73;
+}
+.chip-tabs .new-collection-trigger {
+  margin-inline-start: 6px;
+  min-width: 70px;
+  min-height: 28px;
+  padding-inline: 7px;
+  gap: 4px;
+  color: #59378b;
+  font-size: 12px;
+  font-weight: 600;
+}
+.chip-tabs .new-collection-trigger[aria-expanded="true"] {
+  background: #ede5f5;
 }

@@ -1,6 +1,7 @@
 import { ConfigProvider, Switch, Tabs } from "antd"
 import { useEffect, useRef, useState } from "react"
 
+import { MAX_COLLECTION_NAME_LENGTH, orderedCollections } from "../lib/filters"
 import { getSessionTiming, isConcentrating } from "../lib/session"
 import {
   addCollection,
@@ -11,6 +12,7 @@ import {
   setShortsHidden,
   setSuggestedHidden,
   subscribeToStoredState,
+  swapCollections,
   useUntimedFiltering
 } from "../lib/storage"
 import type { FilterCollection, StoredState } from "../types/filter"
@@ -130,8 +132,8 @@ function IndexPopup() {
     setFromCollections(view === "collections")
     setView("rules")
   }
-  const groups = state?.collections ?? []
-  function collectionRow(group: FilterCollection) {
+  const groups = orderedCollections(state?.collections)
+  function collectionRow(group: FilterCollection, index = 0) {
     const rules = state!.filters.filter(
       (rule) => rule.collectionId === group.id
     )
@@ -157,6 +159,26 @@ function IndexPopup() {
             {group.enabled ? "Activa" : "Pausada"}
           </button>
         </div>
+        {view === "collections" && groups.length > 1 && (
+          <div>
+            <button
+              aria-label={`Subir ${group.name}`}
+              disabled={index === 0}
+              onClick={() =>
+                save(() => swapCollections(group.id, groups[index - 1].id))
+              }>
+              ↑ Subir
+            </button>
+            <button
+              aria-label={`Bajar ${group.name}`}
+              disabled={index === groups.length - 1}
+              onClick={() =>
+                save(() => swapCollections(group.id, groups[index + 1].id))
+              }>
+              ↓ Bajar
+            </button>
+          </div>
+        )}
         {view === "collections" &&
           (deleting === group.id ? (
             <div className="row">
@@ -349,10 +371,13 @@ function IndexPopup() {
                   e.preventDefault()
                   if (await save(() => addCollection(name))) setName("")
                 }}>
-                <label htmlFor="group-name">Nueva colección</label>
+                <label htmlFor="group-name">
+                  Nueva colección (máx. {MAX_COLLECTION_NAME_LENGTH} caracteres)
+                </label>
                 <div className="row">
                   <input
                     id="group-name"
+                    maxLength={MAX_COLLECTION_NAME_LENGTH}
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Ej. Juegos"

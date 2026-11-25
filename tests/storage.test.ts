@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import { beforeEach, test } from "node:test"
 
+import { MAX_COLLECTION_NAME_LENGTH, orderedCollections } from "../lib/filters"
 import { shouldHideVideo } from "../lib/matching"
 import {
   addCollection,
@@ -20,9 +21,42 @@ import {
   setSuggestedHidden,
   startStudySession,
   subscribeToStoredState,
+  swapCollections,
   useUntimedFiltering
 } from "../lib/storage"
 import type { StoredState } from "../types/filter"
+
+test("intercambiar carpetas no cambia las intermedias, las reglas ni las pausas", async () => {
+  const a = (await addCollection("Juegos")).collections![0]
+  const b = (await addCollection("Noticias")).collections![1]
+  const c = (await addCollection("Música")).collections![2]
+  await addFilter("keyword", "deadlock", a.id)
+  const before = await setCollectionEnabled(c.id, false)
+  const moved = await swapCollections(a.id, c.id)
+  assert.deepEqual(
+    orderedCollections(moved.collections).map((g) => g.id),
+    [a.id, b.id, c.id]
+  )
+  assert.deepEqual(moved.filters, before.filters)
+  assert.equal(moved.collections![0].enabled, false)
+  await assert.rejects(swapCollections(a.id, "ausente"), /colección/)
+  failWrite = true
+  await assert.rejects(swapCollections(c.id, a.id), /guardar/)
+  assert.deepEqual(await getStoredState(), moved)
+})
+
+test("el límite se aplica al crear carpetas y conserva los nombres antiguos", async () => {
+  const name = "a".repeat(MAX_COLLECTION_NAME_LENGTH)
+  const group = (await addCollection(name)).collections![0]
+  const before = await addFilter("channel", "Canal Uno")
+  await assert.rejects(addCollection(name + "a"), /caracteres/)
+  await assert.rejects(addCollection(name + "a", before.filters), /caracteres/)
+  assert.deepEqual(await getStoredState(), before)
+  const legacy = { ...group, name: name + " antigua" }
+  values.distrautState = { ...before, collections: [legacy] }
+  const after = await addCollection("Nueva")
+  assert.deepEqual(after.collections![0], legacy)
+})
 
 let values: Record<string, unknown>
 let failWrite: boolean
@@ -287,6 +321,48 @@ test("mueve palabras y canales juntos conservando sus IDs y pausas", async () =>
   const created = await addCollection("Lectura", [other.id])
   assert.equal(created.filters[2].collectionId, created.collections![1].id)
   assert.equal(created.filters[2].id, other.id)
+})
+
+test("mueve entre colecciones y devuelve a individuales conservando las pausas y las carpetas", async () => {
+  const a = (await addCollection("Juegos")).collections![0]
+  const b = (await addCollection("Ocio")).collections![1]
+  const word = (await addFilter("keyword", "Deadlock", a.id)).filters[0]
+  const channel = (await addFilter("channel", "Noticias", b.id)).filters[1]
+  await setFilterEnabled(word.id, false)
+  const moved = await moveFiltersToCollection([word, channel], b.id)
+  assert.deepEqual(moved.filters, [
+    { ...word, enabled: false, collectionId: b.id },
+    channel
+  ])
+  await assert.rejects(moveFiltersToCollection([word]), /selección cambió/)
+  const individual = await moveFiltersToCollection(moved.filters)
+  assert.deepEqual(
+    individual.filters,
+    moved.filters.map(({ collectionId, ...rule }) => rule)
+  )
+  assert.deepEqual(individual.collections, [a, b])
+  const grouped = await moveFiltersToCollection(individual.filters, a.id)
+  const created = await addCollection("Nueva", grouped.filters)
+  assert.ok(
+    created.filters.every(
+      (rule) => rule.collectionId === created.collections![2].id
+    )
+  )
+})
+
+test("homónimos entre orígenes o en Individuales rechazan el lote completo", async () => {
+  const a = (await addCollection("A")).collections![0]
+  const b = (await addCollection("B")).collections![1]
+  const first = (await addFilter("keyword", "Café", a.id)).filters[0]
+  const second = (await addFilter("keyword", "CAFE", b.id)).filters[1]
+  const before = await getStoredState()
+  await assert.rejects(moveFiltersToCollection([first, second]), /repite/)
+  await assert.rejects(addCollection("Nueva", [first, second]), /repite/)
+  assert.deepEqual(await getStoredState(), before)
+  await moveFiltersToCollection([second])
+  const individual = await getStoredState()
+  await assert.rejects(moveFiltersToCollection([first]), /Individuales/)
+  assert.deepEqual(await getStoredState(), individual)
 })
 
 test("rechaza el lote entero ante duplicados, selección obsoleta o fallo de escritura", async () => {
