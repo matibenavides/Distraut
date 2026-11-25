@@ -25,7 +25,7 @@ import "./popup.css"
 
 function IndexPopup() {
   const [state, setState] = useState<StoredState>()
-  const [tab, setTab] = useState("filters")
+  const [tab, setTab] = useState("session")
   const [error, setError] = useState("")
   const [busy, setBusy] = useState(false)
   const [attempt, setAttempt] = useState(0)
@@ -49,13 +49,18 @@ function IndexPopup() {
       ? state?.collections?.find((group) => group.id === origin)
       : undefined
   const heading = useRef<HTMLHeadingElement>(null)
+  const sessionHeading = useRef<HTMLHeadingElement>(null)
   const focusedBeforeSave = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
     if (!busy && document.activeElement === document.body) {
       const previous = focusedBeforeSave.current
       if (previous) {
-        const target = previous.isConnected ? previous : heading.current
+        const target = previous.isConnected
+          ? previous
+          : tab === "session"
+            ? sessionHeading.current
+            : heading.current
         target?.focus()
         focusedBeforeSave.current = null
       }
@@ -175,32 +180,31 @@ function IndexPopup() {
       </div>
     )
   }
-  const filterPanel = (
+  const feedback = (
     <>
-      {view !== "home" && (
-        <button
-          className="back"
-          onClick={() => {
-            setDeleting("")
-            setView(
-              view === "rules" && fromCollections ? "collections" : "home"
-            )
-            setError("")
-          }}>
-          {view === "rules" && fromCollections
-            ? "‹ Volver a colecciones"
-            : "‹ Volver a Distraut"}
-        </button>
+      {error && (
+        <p role="alert" className="error">
+          {error}
+        </p>
       )}
+      {!state ? (
+        error ? (
+          <button onClick={() => setAttempt((n) => n + 1)}>
+            Volver a cargar
+          </button>
+        ) : (
+          <p role="status">Cargando reglas…</p>
+        )
+      ) : null}
+    </>
+  )
+  const sessionPanel = (
+    <>
       <div className="row">
-        <h1 ref={heading} tabIndex={-1}>
-          {view === "home"
-            ? "Distraut"
-            : view === "rules"
-              ? inCollection?.name ?? "Filtros guardados"
-              : "Colecciones"}
+        <h1 ref={sessionHeading} tabIndex={-1}>
+          Distraut
         </h1>
-        {view === "home" && state && (
+        {state && (
           <span
             className="status"
             data-on={
@@ -218,78 +222,99 @@ function IndexPopup() {
           </span>
         )}
       </div>
+      {feedback}
+      {state && (
+        <fieldset disabled={busy} aria-busy={busy}>
+          <StudySession state={state} save={save} now={now} />
+          <div className="filter-control row">
+            <label htmlFor="filtering">Habilitar filtros de YouTube</label>
+            <Switch
+              id="filtering"
+              checked={state.enabled && !expired}
+              disabled={busy}
+              onChange={(enabled) =>
+                save(() =>
+                  enabled && expired
+                    ? useUntimedFiltering()
+                    : setFilteringEnabled(enabled)
+                )
+              }
+            />
+          </div>
+          {(timing?.paused || timing?.resting) && (
+            <small>
+              La sesión reactivará los filtros habilitados al volver a
+              concentración.
+            </small>
+          )}
+          <div className="filter-control row">
+            <label htmlFor="hide-shorts">Ocultar Shorts</label>
+            <Switch
+              id="hide-shorts"
+              checked={state.hideShorts ?? false}
+              disabled={busy}
+              aria-describedby="shorts-help"
+              onChange={(hidden) => save(() => setShortsHidden(hidden))}
+            />
+          </div>
+          <small id="shorts-help">
+            Independiente de los filtros y de la sesión de estudio.
+          </small>
+          <div className="filter-control row">
+            <label htmlFor="hide-suggested">Ocultar videos sugeridos</label>
+            <Switch
+              id="hide-suggested"
+              checked={!!state.hideSuggested || suggestedBySession}
+              disabled={busy || suggestedBySession}
+              aria-describedby="suggested-help"
+              onChange={(hidden) => save(() => setSuggestedHidden(hidden))}
+            />
+          </div>
+          <small id="suggested-help">
+            {suggestedBySession
+              ? "Activo por la sesión. Al pausar o finalizar se recupera tu selección independiente."
+              : "Oculta el panel junto al reproductor. También se activa durante la concentración."}
+          </small>
+        </fieldset>
+      )}
+    </>
+  )
+  const filterPanel = (
+    <>
+      {view !== "home" && (
+        <button
+          className="back"
+          onClick={() => {
+            setDeleting("")
+            setView(
+              view === "rules" && fromCollections ? "collections" : "home"
+            )
+            setError("")
+          }}>
+          {view === "rules" && fromCollections
+            ? "‹ Volver a colecciones"
+            : "‹ Volver a filtros"}
+        </button>
+      )}
+      <div className="row">
+        <h1 ref={heading} tabIndex={-1}>
+          {view === "home"
+            ? "Filtros"
+            : view === "rules"
+              ? inCollection?.name ?? "Filtros guardados"
+              : "Colecciones"}
+        </h1>
+      </div>
       {inCollection && (
         <p className="collection-context">
           Estás editando la colección <strong>{inCollection.name}</strong>
         </p>
       )}
-      {error && (
-        <p role="alert" className="error">
-          {error}
-        </p>
-      )}
-      {!state ? (
-        error ? (
-          <button onClick={() => setAttempt((n) => n + 1)}>
-            Volver a cargar
-          </button>
-        ) : (
-          <p role="status">Cargando reglas…</p>
-        )
-      ) : (
+      {feedback}
+      {state && (
         <fieldset disabled={busy} aria-busy={busy}>
           {view === "home" && (
             <>
-              <StudySession state={state} save={save} now={now} />
-              <div className="filter-control row">
-                <label htmlFor="filtering">Habilitar filtros de YouTube</label>
-                <Switch
-                  id="filtering"
-                  checked={state.enabled && !expired}
-                  disabled={busy}
-                  onChange={(enabled) =>
-                    save(() =>
-                      enabled && expired
-                        ? useUntimedFiltering()
-                        : setFilteringEnabled(enabled)
-                    )
-                  }
-                />
-              </div>
-              {(timing?.paused || timing?.resting) && (
-                <small>
-                  La sesión reactivará los filtros habilitados al volver a
-                  concentración.
-                </small>
-              )}
-              <div className="filter-control row">
-                <label htmlFor="hide-shorts">Ocultar Shorts</label>
-                <Switch
-                  id="hide-shorts"
-                  checked={state.hideShorts ?? false}
-                  disabled={busy}
-                  aria-describedby="shorts-help"
-                  onChange={(hidden) => save(() => setShortsHidden(hidden))}
-                />
-              </div>
-              <small id="shorts-help">
-                Independiente de los filtros y de la sesión de estudio.
-              </small>
-              <div className="filter-control row">
-                <label htmlFor="hide-suggested">Ocultar videos sugeridos</label>
-                <Switch
-                  id="hide-suggested"
-                  checked={!!state.hideSuggested || suggestedBySession}
-                  disabled={busy || suggestedBySession}
-                  aria-describedby="suggested-help"
-                  onChange={(hidden) => save(() => setSuggestedHidden(hidden))}
-                />
-              </div>
-              <small id="suggested-help">
-                {suggestedBySession
-                  ? "Activo por la sesión. Al pausar o finalizar se recupera tu selección independiente."
-                  : "Oculta el panel junto al reproductor. También se activa durante la concentración."}
-              </small>
               <section>
                 <AddFilter state={state} save={save} />
               </section>
@@ -363,6 +388,7 @@ function IndexPopup() {
           activeKey={tab}
           onChange={setTab}
           items={[
+            { key: "session", label: "Sesión", children: sessionPanel },
             { key: "filters", label: "Filtros", children: filterPanel },
             {
               key: "statistics",
