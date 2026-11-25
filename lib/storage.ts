@@ -343,7 +343,50 @@ function requireCollection(state: StoredState, id: string) {
   return group
 }
 
-export function addCollection(name: string) {
+function assignIndividualFilters(
+  state: StoredState,
+  ids: readonly string[],
+  group: FilterCollection
+) {
+  const selected = new Set(ids)
+  const rules = state.filters.filter((rule) => selected.has(rule.id))
+  if (
+    !selected.size ||
+    rules.length !== selected.size ||
+    rules.some((rule) => rule.collectionId !== undefined)
+  )
+    throw new Error("La selección cambió. Revisa los filtros individuales.")
+
+  const key = (rule: Filter) =>
+    rule.type + ":" + normalizeFilterValue(rule.value)
+  const existing = new Set(
+    state.filters.filter((rule) => rule.collectionId === group.id).map(key)
+  )
+  for (const rule of rules) {
+    if (existing.has(key(rule)))
+      throw new Error(
+        `«${rule.value}» ya existe en «${group.name}». Quita ese filtro de la selección y vuelve a intentarlo.`
+      )
+    existing.add(key(rule))
+  }
+  return {
+    ...state,
+    filters: state.filters.map((rule) =>
+      selected.has(rule.id) ? { ...rule, collectionId: group.id } : rule
+    )
+  }
+}
+
+export function moveFiltersToCollection(
+  ids: readonly string[],
+  groupId: string
+) {
+  return updateState((state) =>
+    assignIndividualFilters(state, ids, requireCollection(state, groupId))
+  )
+}
+
+export function addCollection(name: string, filterIds?: readonly string[]) {
   return updateState((state) => {
     const groups = state.collections ?? []
     const normalized = normalizeFilterValue(name)
@@ -351,7 +394,8 @@ export function addCollection(name: string) {
     if (groups.some((group) => normalizeFilterValue(group.name) === normalized))
       throw new Error("Ya existe una colección con ese nombre.")
     const group = { id: crypto.randomUUID(), name: name.trim(), enabled: true }
-    return { ...state, collections: [...groups, group] }
+    const next = { ...state, collections: [...groups, group] }
+    return filterIds ? assignIndividualFilters(next, filterIds, group) : next
   })
 }
 

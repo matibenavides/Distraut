@@ -7,6 +7,7 @@ import {
   addFilter,
   endStudySession,
   getStoredState,
+  moveFiltersToCollection,
   recordHiddenCounts,
   recordPlayback,
   removeCollection,
@@ -267,6 +268,55 @@ test("conserva reglas antiguas y gestiona cada aparición solo en su origen", as
     addFilter("keyword", "React", group.id),
     /No se encontró/
   )
+})
+
+test("mueve palabras y canales juntos conservando sus IDs y pausas", async () => {
+  const a = (await addFilter("keyword", "Arte")).filters[0]
+  const b = (await addFilter("channel", "Arte")).filters[1]
+  await setFilterEnabled(b.id, false)
+  const other = (await addFilter("channel", "Otro")).filters[2]
+  const group = (await addCollection("Estudio")).collections![0]
+  await setCollectionEnabled(group.id, false)
+  const moved = await moveFiltersToCollection([a.id, b.id], group.id)
+  assert.deepEqual(moved.filters, [
+    { ...a, collectionId: group.id },
+    { ...b, enabled: false, collectionId: group.id },
+    other
+  ])
+  assert.equal(shouldHideVideo(moved, { title: "Arte" }), false)
+  const created = await addCollection("Lectura", [other.id])
+  assert.equal(created.filters[2].collectionId, created.collections![1].id)
+  assert.equal(created.filters[2].id, other.id)
+})
+
+test("rechaza el lote entero ante duplicados, selección obsoleta o fallo de escritura", async () => {
+  const group = (await addCollection("Charlas")).collections![0]
+  await addFilter("keyword", "Café", group.id)
+  const a = (await addFilter("channel", "Canal")).filters[1]
+  const b = (await addFilter("keyword", "cafe")).filters[2]
+  const before = await getStoredState()
+  await assert.rejects(
+    moveFiltersToCollection([a.id, b.id], group.id),
+    /ya existe/
+  )
+  await assert.rejects(
+    moveFiltersToCollection([a.id], "eliminada"),
+    /colección/
+  )
+  await assert.rejects(addCollection("Nueva", [a.id, "ausente"]), /selección/)
+  await assert.rejects(addCollection("Chárlas", [a.id]), /Ya existe/)
+  failWrite = true
+  await assert.rejects(moveFiltersToCollection([a.id], group.id), /guardar/)
+  assert.deepEqual(await getStoredState(), before)
+  failWrite = false
+  const race = await Promise.allSettled([
+    moveFiltersToCollection([a.id], group.id),
+    addCollection("Otro destino", [a.id])
+  ])
+  assert.equal(race.filter((result) => result.status === "fulfilled").length, 1)
+  const after = await getStoredState()
+  assert.equal(after.filters.length, before.filters.length)
+  assert.ok(after.filters[1].collectionId)
 })
 
 beforeEach(() => {

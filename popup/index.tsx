@@ -317,7 +317,7 @@ function IndexPopup() {
             <>
               <section aria-labelledby="hidden-filters-title">
                 <h2 id="hidden-filters-title">Palabras y canales ocultos</h2>
-                <AddFilter state={state} save={save} />
+                <AddFilter state={state} save={save} busy={busy} />
                 <button
                   className="filter-library-link"
                   onClick={() => openRules()}>

@@ -56,11 +56,6 @@
   margin: 0 0 7px;
   font-size: 14px;
 }
-.filter-count {
-  color: #625b70;
-  font-size: 12px;
-  font-weight: 400;
-}
 .filter-entry {
   display: flex;
   align-items: stretch;
@@ -91,7 +86,7 @@
   align-items: center;
   gap: 5px;
   max-width: 100%;
-  padding: 2px 4px 2px 10px;
+  padding: 2px 4px;
   border: 1px solid transparent;
   border-radius: 8px;
   background: #ede5f5;
@@ -131,4 +126,92 @@
 }
 .feedback:empty {
   margin: 0;
+}
+.filter-chip[data-selected="true"] {
+  border-color: currentColor;
+  box-shadow: inset 0 0 0 1px currentColor;
+}
+.popup .filter-chip .select-chip {
+  min-width: 0;
+  flex-shrink: 1;
+  padding: 3px 5px;
+  font-size: inherit;
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: grab;
+}
+.select-chip .anticon {
+  margin-right: 4px;
+}
+.move-panel {
+  margin-top: 12px;
+  padding: 8px 12px 12px;
+  background: #f4eff8;
+  border-inline-start: 3px solid #65449a;
+  border-radius: 4px;
+}
+.move-targets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-block: 8px;
+}
+.move-panel[data-dragging="true"] {
+  position: fixed;
+  z-index: 5;
+  inset: auto 20px 10px;
+  max-height: 38vh;
+  overflow-y: auto;
+  box-shadow: 0 3px 14px #30293f26;
+}
+.move-targets .ant-btn {
+  height: auto;
+  min-height: 32px;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+.move-targets .ant-btn[data-over="true"],
+.chip-tab-name[data-over="true"] {
+  color: #265b43;
+  border-color: #43846c;
+  background: #dff2e8;
+  outline: 2px solid #43846c;
+}
+.collection-chips {
+  margin-top: 0;
+}
+.collection-chips .filter-chip {
+  padding: 4px 8px;
+}
+.chip-tabs {
+  margin-top: 6px;
+}
+.chip-tabs.ant-tabs > .ant-tabs-nav {
+  margin-bottom: 2px;
+}
+.chip-tabs.ant-tabs .ant-tabs-tab {
+  padding: 5px 2px;
+  font-size: 12px;
+}
+.chip-tabs.ant-tabs .ant-tabs-tab:has(.chip-tab-name) {
+  padding: 0;
+}
+.chip-tab-name {
+  display: block;
+  padding: 5px 2px;
+  border-radius: 4px;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chip-tab-name[data-over="true"] {
+  outline-offset: -2px;
+}
+.move-panel form {
+  display: flex;
+  gap: 6px;
+  align-items: center;
 }
