@@ -8,8 +8,9 @@
     "dev": "plasmo dev",
     "build": "plasmo build",
     "package": "plasmo package",
+    "clean": "node scripts/clean.mjs",
     "typecheck": "tsc --noEmit --incremental false",
-    "test": "tsc -p tsconfig.test.json && node --test build/tests/tests/*.test.js"
+    "test": "node scripts/test.mjs"
   },
   "dependencies": {
     "@ant-design/icons": "6.3.4",

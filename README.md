@@ -10,8 +10,6 @@ First, run the development server:
 
 ```bash
 pnpm dev
-# or
-npm run dev
 ```
 
 Open your browser and load the appropriate development build. For example, if you are developing for the chrome browser, using manifest v3, use: `build/chrome-mv3-dev`.
@@ -39,6 +37,7 @@ styles/
 lib/              # Validation, matching, storage and DOM adapters
 types/            # Data contracts and CSS import declaration
 tests/            # Logic and DOM fixtures
+scripts/          # Test runner and generated-output cleanup
 design/           # Visual direction and sketch brief
 ```
 
@@ -48,14 +47,20 @@ Keep feature-specific styles beside their components. Shared foundations belong 
 
 For further guidance, [visit our Documentation](https://docs.plasmo.com/)
 
+## Generated files and cleanup
+
+`build/` is reserved for extension builds and packaged releases. `pnpm test` temporarily compiles tests into `build/tests` and removes that output when it finishes, including failures. Test sources stay in `tests/`.
+
+`pnpm run clean` deletes `build/`, `.plasmo/`, `coverage/` and `.tsbuildinfo`. It preserves source code, documentation and installed dependencies. Recreate the extension with `pnpm run build` or `pnpm run dev` before loading or reloading it in Chrome. A loaded unpacked extension needs its build directory to remain available.
+
+Screenshots, browser profiles and one-off verification scripts belong in a task-specific directory under the operating system's temporary directory, and must be removed when the task ends. Keep durable results in the project documentation and Notion. Historical verification files previously stored directly in `build/` were removed during the cleanup on 2026-11-25; their documented results remain available.
+
 ## Making production build
 
 Run the following:
 
 ```bash
 pnpm build
-# or
-npm run build
 ```
 
 This should create a production bundle for your extension, ready to be zipped and published to the stores.
