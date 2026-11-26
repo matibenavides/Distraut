@@ -2,7 +2,7 @@ import CheckOutlined from "@ant-design/icons/es/icons/CheckOutlined"
 import CloseOutlined from "@ant-design/icons/es/icons/CloseOutlined"
 import FolderAddOutlined from "@ant-design/icons/es/icons/FolderAddOutlined"
 import FolderOutlined from "@ant-design/icons/es/icons/FolderOutlined"
-import { Button, Tabs } from "antd"
+import { Button, Dropdown, Tabs } from "antd"
 import {
   useEffect,
   useRef,
@@ -66,7 +66,9 @@ function FilterGroup({
   const keyword = type === "keyword"
   const title = keyword ? "Ocultar palabra" : "Ocultar canal"
   const [activeGroup, setActiveGroup] = useState("")
+  const [showMore, setShowMore] = useState(false)
   const [collectionName, setCollectionName] = useState<string | null>(null)
+  const moreTrigger = useRef<HTMLButtonElement>(null)
   const collectionTrigger = useRef<HTMLButtonElement>(null)
   const editingCollection = collectionName !== null
   const byCollection = new Map<string, StoredState["filters"]>()
@@ -78,9 +80,15 @@ function FilterGroup({
     else byCollection.set(id, [rule])
   }
   const rules = (byCollection.get("") ?? []).reverse()
-  const groups = orderedCollections(state.collections).filter((group) =>
-    collectionVisibleForType(group, state.filters, type)
+  const groups = orderedCollections(state.collections).filter(
+    (group) =>
+      selected.size > 0 || collectionVisibleForType(group, state.filters, type)
   )
+
+  const active = groups.find((group) => group.id === activeGroup)
+  const visible = groups.slice(0, 2)
+  if (active && !visible.includes(active)) visible[1] = active
+  const hidden = groups.filter((group) => !visible.includes(group))
 
   useEffect(() => {
     if (message && input.current?.getClientRects().length) input.current.focus()
@@ -174,29 +182,82 @@ function FilterGroup({
       <Tabs
         className="chip-tabs"
         size="small"
-        tabBarGutter={14}
+        tabBarGutter={8}
         tabBarExtraContent={
-          <Button
-            ref={collectionTrigger}
-            className="new-collection-trigger"
-            size="small"
-            type="text"
-            disabled={busy}
-            icon={editingCollection ? <CloseOutlined /> : <FolderAddOutlined />}
-            aria-expanded={editingCollection}
-            aria-controls={
-              editingCollection ? `collection-editor-${type}` : undefined
-            }
-            aria-label={
-              editingCollection ? "Cerrar nueva colección" : "Nueva colección"
-            }
-            title={editingCollection ? "Cerrar" : "Nueva colección"}
-            onClick={() => {
-              setMessage("")
-              setCollectionName(editingCollection ? null : "")
-            }}>
-            {editingCollection ? "Cerrar" : "Nueva"}
-          </Button>
+          <div className="chip-tab-actions">
+            {hidden.length > 0 && (
+              <Dropdown
+                trigger={["click"]}
+                placement="bottomRight"
+                open={showMore}
+                onOpenChange={setShowMore}
+                destroyOnHidden
+                disabled={busy}
+                styles={{
+                  menu: { maxHeight: 180, overflowY: "auto", width: 235 }
+                }}
+                menu={{
+                  items: hidden.map((group) => ({
+                    key: group.id,
+                    label: (
+                      <span
+                        className="chip-tab-name collection-menu-name"
+                        title={group.name}
+                        {...dropTarget(group, type)}>
+                        <FolderOutlined aria-hidden="true" /> {group.name}
+                      </span>
+                    )
+                  })),
+                  onClick: ({ key }) => {
+                    setActiveGroup(key)
+                    setShowMore(false)
+                    moreTrigger.current?.focus()
+                  }
+                }}>
+                <Button
+                  ref={moreTrigger}
+                  size="small"
+                  type="text"
+                  className="more-collections-trigger"
+                  aria-label={`Más colecciones (${hidden.length})`}
+                  aria-expanded={showMore}
+                  aria-haspopup="menu"
+                  onDragOver={(event) => {
+                    if (
+                      !busy &&
+                      (event.dataTransfer.types.includes(dragType) ||
+                        event.dataTransfer.types.includes(folderDragType))
+                    )
+                      setShowMore(true)
+                  }}>
+                  <span aria-hidden="true">···</span>
+                </Button>
+              </Dropdown>
+            )}
+            <Button
+              ref={collectionTrigger}
+              className="new-collection-trigger"
+              size="small"
+              type="text"
+              disabled={busy}
+              icon={
+                editingCollection ? <CloseOutlined /> : <FolderAddOutlined />
+              }
+              aria-expanded={editingCollection}
+              aria-controls={
+                editingCollection ? `collection-editor-${type}` : undefined
+              }
+              aria-label={
+                editingCollection ? "Cerrar nueva colección" : "Nueva colección"
+              }
+              title={editingCollection ? "Cerrar" : "Nueva colección"}
+              onClick={() => {
+                setMessage("")
+                setCollectionName(editingCollection ? null : "")
+              }}>
+              {editingCollection ? "Cerrar" : "Nueva"}
+            </Button>
+          </div>
         }
         renderTabBar={(props, TabBar) => (
           <>
@@ -263,9 +324,7 @@ function FilterGroup({
         aria-label={
           keyword ? "Palabras por colección" : "Canales por colección"
         }
-        activeKey={
-          groups.some((group) => group.id === activeGroup) ? activeGroup : ""
-        }
+        activeKey={active?.id ?? ""}
         onChange={setActiveGroup}
         items={[
           {
@@ -279,14 +338,15 @@ function FilterGroup({
               <small>Sin filtros individuales.</small>
             )
           },
-          ...groups.map((group) => ({
+          ...visible.map((group) => ({
             key: group.id,
             label: (
               <span
                 className="chip-tab-name"
                 title={group.name}
                 {...dropTarget(group, type)}>
-                <FolderOutlined aria-hidden="true" /> {group.name}
+                <FolderOutlined aria-hidden="true" />{" "}
+                <span className="collection-tab-label">{group.name}</span>
               </span>
             ),
             children: (
@@ -322,11 +382,13 @@ function FilterGroup({
 export function AddFilter({
   state,
   save,
-  busy
+  busy,
+  onSelectionCount
 }: {
   state: StoredState
   save: Save
   busy: boolean
+  onSelectionCount: (count: number) => void
 }) {
   const [marked, setMarked] = useState<Filter[]>([])
   const [over, setOver] = useState("")
@@ -339,11 +401,10 @@ export function AddFilter({
     (rule) => origins.has(rule.id) && origins.get(rule.id) === rule.collectionId
   )
   const selectedIds = new Set(selected.map((rule) => rule.id))
-  const destinations: (FilterCollection | undefined)[] = orderedCollections(
-    state.collections
-  )
-  if (selected.some((rule) => rule.collectionId !== undefined))
-    destinations.unshift(undefined)
+  useEffect(() => {
+    onSelectionCount(selected.length)
+  }, [selected.length, onSelectionCount])
+  useEffect(() => () => onSelectionCount(0), [onSelectionCount])
 
   useEffect(() => {
     if (notice && composer.current?.getClientRects().length)
@@ -404,10 +465,10 @@ export function AddFilter({
   }
   function dropTarget(
     group: FilterCollection | undefined,
-    surface: FilterType | "panel"
+    surface: FilterType
   ) {
     const target = `${surface}:${group?.id ?? ""}`
-    const folderTab = !!group && surface !== "panel"
+    const folderTab = !!group
     function accepts(e: DragEvent) {
       if (busy) return false
       if (draggedFolder)
@@ -473,59 +534,13 @@ export function AddFilter({
   return (
     <div className="filter-composer" ref={composer}>
       <p className="filter-intro">
-        Selecciona o arrastra etiquetas para moverlas.{" "}
+        Selecciona etiquetas y arrástralas a una carpeta para agruparlas. Para
+        sacarlas, suéltalas en Individuales.{" "}
         {(state.collections?.length ?? 0) > 1 &&
           "Arrastra una carpeta sobre otra para intercambiar su posición."}
       </p>
       <FilterGroup type="keyword" {...controls} />
       <FilterGroup type="channel" {...controls} />
-      {selected.length > 0 && (
-        <div className="move-panel" data-dragging={dragged.length > 0}>
-          <div className="row">
-            <strong>
-              {selected.length === 1
-                ? "1 filtro seleccionado"
-                : `${selected.length} filtros seleccionados`}
-            </strong>
-            <button
-              type="button"
-              onClick={() => {
-                const visible = Array.from(
-                  composer.current?.querySelectorAll<HTMLButtonElement>(
-                    '.select-chip[aria-pressed="true"]'
-                  ) ?? []
-                ).find((button) => button.getClientRects().length)
-                const focusTarget =
-                  visible ?? composer.current?.querySelector("input")
-                focusTarget?.focus()
-                setMarked([])
-              }}>
-              Cancelar
-            </button>
-          </div>
-          <small>
-            {state.collections?.length
-              ? "Suelta la selección o pulsa su destino."
-              : "Crea una colección para esta selección."}
-          </small>
-          <div className="move-targets">
-            {destinations.map((group) => (
-              <Button
-                key={group?.id ?? ""}
-                icon={group && <FolderOutlined />}
-                disabled={
-                  busy ||
-                  selected.every((rule) => rule.collectionId === group?.id)
-                }
-                {...dropTarget(group, "panel")}
-                onClick={() => void transfer(selected, group)}>
-                {group?.name ?? "Individuales"}
-                {group?.enabled === false && " · pausada"}
-              </Button>
-            ))}
-          </div>
-        </div>
-      )}
       <small className="feedback" role="status">
         {notice}
       </small>

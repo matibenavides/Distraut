@@ -143,37 +143,14 @@
 .select-chip .anticon {
   margin-right: 4px;
 }
-.move-panel {
-  margin-top: 12px;
-  padding: 8px 12px 12px;
-  background: #f4eff8;
-  border-inline-start: 3px solid #65449a;
-  border-radius: 4px;
+.selection-count {
+  margin-left: auto;
+  max-width: 180px;
+  text-align: right;
+  color: #624096;
+  font-size: 12px;
 }
-.move-targets {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-block: 8px;
-}
-.move-panel[data-dragging="true"] {
-  position: fixed;
-  z-index: 5;
-  inset: auto 20px 10px;
-  max-height: 38vh;
-  overflow-y: auto;
-  box-shadow: 0 3px 14px #30293f26;
-}
-.move-targets .ant-btn {
-  height: auto;
-  min-height: 32px;
-  max-width: 100%;
-  white-space: normal;
-  overflow-wrap: anywhere;
-  text-align: left;
-}
-.move-targets .ant-btn[data-over="true"],
-.chip-tab-name[data-over="true"] {
+.popup .chip-tab-name[data-over="true"] {
   color: #265b43;
   border-color: #43846c;
   background: #dff2e8;
@@ -202,10 +179,34 @@
   display: block;
   padding: 5px 2px;
   border-radius: 4px;
-  max-width: 140px;
+}
+.chip-tab-name:has(.collection-tab-label) {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 86px;
+}
+.collection-tab-label {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.chip-tab-name > .anticon {
+  flex-shrink: 0;
+}
+.collection-menu-name {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.chip-tab-actions {
+  display: flex;
+  align-items: center;
+  margin-inline-start: 4px;
+}
+.chip-tabs .more-collections-trigger {
+  min-width: 28px;
+  color: #59378b;
 }
 .chip-tab-name[data-over="true"] {
   outline-offset: -2px;

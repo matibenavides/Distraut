@@ -30,6 +30,7 @@ function IndexPopup() {
   const [tab, setTab] = useState("session")
   const [error, setError] = useState("")
   const [busy, setBusy] = useState(false)
+  const [selectionCount, setSelectionCount] = useState(0)
   const [attempt, setAttempt] = useState(0)
   const [view, setView] = useState<"home" | "collections" | "rules">("home")
   const [origin, setOrigin] = useState("")
@@ -326,6 +327,13 @@ function IndexPopup() {
               ? inCollection?.name ?? "Filtros guardados"
               : "Colecciones"}
         </h1>
+        {view === "home" && (
+          <small className="selection-count" role="status">
+            {selectionCount > 0
+              ? `${selectionCount} ${selectionCount === 1 ? "filtro seleccionado" : "filtros seleccionados"}`
+              : ""}
+          </small>
+        )}
       </div>
       {inCollection && (
         <p className="collection-context">
@@ -339,7 +347,12 @@ function IndexPopup() {
             <>
               <section aria-labelledby="hidden-filters-title">
                 <h2 id="hidden-filters-title">Palabras y canales ocultos</h2>
-                <AddFilter state={state} save={save} busy={busy} />
+                <AddFilter
+                  state={state}
+                  save={save}
+                  busy={busy}
+                  onSelectionCount={setSelectionCount}
+                />
                 <button
                   className="filter-library-link"
                   onClick={() => openRules()}>
