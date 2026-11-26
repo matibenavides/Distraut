@@ -172,7 +172,7 @@ function FilterGroup({
               setMessage("")
             }}
           />
-          <button
+          <button style={{ paddingBottom: "4px", fontWeight: "bold" }}
             className="primary"
             aria-label={keyword ? "Añadir palabra clave" : "Añadir canal"}>
             <span aria-hidden="true">+</span>
