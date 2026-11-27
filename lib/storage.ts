@@ -9,7 +9,12 @@ import {
   MAX_COLLECTION_NAME_LENGTH,
   normalizeFilterValue
 } from "./filters"
-import { addPlaybackInterval, settleStudyTime } from "./statistics"
+import {
+  addPlaybackInterval,
+  localDay,
+  settleStudyTime,
+  weekDays
+} from "./statistics"
 
 const STORAGE_KEY = "distrautState"
 
@@ -49,6 +54,8 @@ function parseStoredState(stored: unknown): StoredState {
     const stats = state.statistics
     const count = (n: unknown) =>
       typeof n === "number" && Number.isSafeInteger(n) && n >= 0
+    const dayKey = (value: unknown) =>
+      typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)
     if (
       !stats ||
       typeof stats !== "object" ||
@@ -58,15 +65,28 @@ function parseStoredState(stored: unknown): StoredState {
       typeof stats.studyByDay !== "object" ||
       Array.isArray(stats.studyByDay) ||
       !Object.entries(stats.studyByDay).every(
-        ([day, duration]) => /^\d{4}-\d{2}-\d{2}$/.test(day) && count(duration)
+        ([day, duration]) => dayKey(day) && count(duration)
       ) ||
       (stats.playbackByDay !== undefined &&
         (!stats.playbackByDay ||
           typeof stats.playbackByDay !== "object" ||
           Array.isArray(stats.playbackByDay) ||
           !Object.entries(stats.playbackByDay).every(
-            ([day, duration]) =>
-              /^\d{4}-\d{2}-\d{2}$/.test(day) && count(duration)
+            ([day, duration]) => dayKey(day) && count(duration)
+          ))) ||
+      (stats.hidden !== undefined &&
+        (!stats.hidden ||
+          typeof stats.hidden !== "object" ||
+          !dayKey(stats.hidden.firstDay) ||
+          !stats.hidden.byWeek ||
+          typeof stats.hidden.byWeek !== "object" ||
+          Array.isArray(stats.hidden.byWeek) ||
+          !Object.entries(stats.hidden.byWeek).every(
+            ([week, totals]) =>
+              dayKey(week) &&
+              totals &&
+              count(totals.videos) &&
+              count(totals.shorts)
           )))
     )
       throw new Error(
@@ -237,26 +257,57 @@ export function setSuggestedHidden(
   return updateState((state) => ({ ...state, hideSuggested }))
 }
 
-export function recordHiddenCounts(videos: number, shorts: number) {
-  if (![videos, shorts].every((n) => Number.isSafeInteger(n) && n >= 0))
-    return Promise.reject(new Error("Recuento de ocultaciones inválido."))
+export function initializeHiddenCounts(now = Date.now()) {
   return updateState((state) => {
     const statistics = state.statistics ?? {
       videos: 0,
       shorts: 0,
       studyByDay: {}
     }
+    return {
+      ...state,
+      statistics: {
+        ...statistics,
+        hidden: statistics.hidden ?? { firstDay: localDay(now), byWeek: {} }
+      }
+    }
+  })
+}
+
+export function recordHiddenCounts(
+  videos: number,
+  shorts: number,
+  now = Date.now()
+) {
+  if (![videos, shorts].every((n) => Number.isSafeInteger(n) && n >= 0))
+    return Promise.reject(new Error("Recuento de ocultaciones inválido."))
+  const week = weekDays(now)[0]
+  const day = localDay(now)
+  return updateState((state) => {
+    const statistics = state.statistics ?? {
+      videos: 0,
+      shorts: 0,
+      studyByDay: {}
+    }
+    const hidden = statistics.hidden
+    const previous = hidden?.byWeek[week]
+    const totals = {
+      videos: (previous?.videos ?? 0) + videos,
+      shorts: (previous?.shorts ?? 0) + shorts
+    }
     if (
-      !Number.isSafeInteger(statistics.videos + videos) ||
-      !Number.isSafeInteger(statistics.shorts + shorts)
+      !Number.isSafeInteger(totals.videos) ||
+      !Number.isSafeInteger(totals.shorts)
     )
       throw new Error("Se alcanzó el límite del contador.")
     return {
       ...state,
       statistics: {
         ...statistics,
-        videos: statistics.videos + videos,
-        shorts: statistics.shorts + shorts
+        hidden: {
+          firstDay: hidden && hidden.firstDay < day ? hidden.firstDay : day,
+          byWeek: { ...hidden?.byWeek, [week]: totals }
+        }
       }
     }
   })

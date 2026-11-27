@@ -7,11 +7,13 @@ import {
   orderedCollections
 } from "../lib/filters"
 import { shouldHideVideo } from "../lib/matching"
+import { weekDays, weeklyHiddenCounts } from "../lib/statistics"
 import {
   addCollection,
   addFilter,
   endStudySession,
   getStoredState,
+  initializeHiddenCounts,
   moveFiltersToCollection,
   recordHiddenCounts,
   recordPlayback,
@@ -168,16 +170,66 @@ test("datos anteriores sin reproducción son válidos y valores corruptos se rec
   await assert.rejects(getStoredState(), /estadísticas guardadas/)
 })
 
-test("estadísticas acumulan sin pisar filtros y rechazan datos incompatibles", async () => {
+test("ocultaciones semanales aíslan el cambio de semana y conservan los datos anteriores", async () => {
+  const sunday = new Date(2026, 10, 29, 23, 59, 59).getTime()
+  const monday = new Date(2026, 10, 30, 0, 0, 0).getTime()
   await addFilter("keyword", "React")
-  await Promise.all([recordHiddenCounts(2, 1), recordHiddenCounts(3, 4)])
+  values.distrautState = {
+    ...(await getStoredState()),
+    statistics: {
+      videos: 100,
+      shorts: 200,
+      studyByDay: { "2026-11-29": 60000 },
+      playbackByDay: { "2026-11-29": 30000 }
+    }
+  }
+  const started = await initializeHiddenCounts(sunday)
+  assert.deepEqual(weeklyHiddenCounts(started.statistics!, weekDays(sunday)), {
+    videos: 0,
+    shorts: 0
+  })
+  await Promise.all([
+    recordHiddenCounts(2, 1, sunday),
+    recordHiddenCounts(3, 4, sunday),
+    recordHiddenCounts(1, 2, monday)
+  ])
+  await initializeHiddenCounts(monday)
   const state = await getStoredState()
-  assert.deepEqual(state.statistics, { videos: 5, shorts: 5, studyByDay: {} })
+  assert.deepEqual(state.statistics, {
+    ...started.statistics,
+    hidden: {
+      firstDay: "2026-11-29",
+      byWeek: {
+        "2026-11-23": { videos: 5, shorts: 5 },
+        "2026-11-30": { videos: 1, shorts: 2 }
+      }
+    }
+  })
+  assert.deepEqual(weeklyHiddenCounts(state.statistics!, weekDays(sunday)), {
+    videos: 5,
+    shorts: 5
+  })
+  assert.deepEqual(weeklyHiddenCounts(state.statistics!, weekDays(monday)), {
+    videos: 1,
+    shorts: 2
+  })
+  assert.equal(
+    weeklyHiddenCounts(state.statistics!, weekDays(sunday, -1)),
+    undefined
+  )
   assert.equal(state.filters.length, 1)
   await assert.rejects(recordHiddenCounts(-1, 0), /inválido/)
   values.distrautState = {
     ...state,
     statistics: { videos: -1, shorts: 0, studyByDay: {} }
+  }
+  await assert.rejects(getStoredState(), /estadísticas guardadas/)
+  values.distrautState = {
+    ...state,
+    statistics: {
+      ...state.statistics,
+      hidden: { firstDay: "2026-11-29", byWeek: { "2026-11-23": null } }
+    }
   }
   await assert.rejects(getStoredState(), /estadísticas guardadas/)
 })

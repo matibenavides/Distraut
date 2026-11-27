@@ -1,5 +1,6 @@
 import type {
   HiddenContent,
+  HiddenCounts,
   StoredState,
   UsageStatistics
 } from "../types/filter"
@@ -85,6 +86,15 @@ export function weekDays(anchor: number, offset = 0): string[] {
     day.setDate(date.getDate() + index)
     return localDay(day.getTime())
   })
+}
+
+export function weeklyHiddenCounts(
+  statistics: UsageStatistics,
+  days: readonly string[]
+): HiddenCounts | undefined {
+  const hidden = statistics.hidden
+  if (!hidden || days[6] < hidden.firstDay) return undefined
+  return hidden.byWeek[days[0]] ?? { videos: 0, shorts: 0 }
 }
 
 export function formatTime(ms: number): string {

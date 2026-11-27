@@ -5,7 +5,8 @@ import {
   formatTime,
   localDay,
   settleStudyTime,
-  weekDays
+  weekDays,
+  weeklyHiddenCounts
 } from "../../../lib/statistics"
 import type { StoredState } from "../../../types/filter"
 
@@ -35,6 +36,8 @@ export function StatisticsPanel({
     studyByDay: {}
   }
   const days = weekDays(now, offset)
+  const hidden = weeklyHiddenCounts(stats, days)
+  const firstHiddenDay = stats.hidden?.firstDay
   const focus = days.includes(selected) ? selected : days[0]
   const playback = (day: string) => stats.playbackByDay?.[day] ?? 0
   const study = (day: string) => stats.studyByDay[day] ?? 0
@@ -219,14 +222,27 @@ export function StatisticsPanel({
       </section>
       <div className="hidden-summary">
         <span>
-          Contenido ocultado <small>Acumulado local</small>
+          Contenido ocultado
+          <small>
+            {dateLabel(days[0])} – {dateLabel(days[6])}
+            {hidden &&
+              firstHiddenDay &&
+              firstHiddenDay > days[0] &&
+              ` · Desde ${dateLabel(firstHiddenDay)}`}
+          </small>
         </span>
-        <strong>{stats.videos + stats.shorts}</strong>
-        <span>
-          {stats.videos} videos
-          <br />
-          {stats.shorts} Shorts
-        </span>
+        {hidden ? (
+          <>
+            <strong>{hidden.videos + hidden.shorts}</strong>
+            <span>
+              {hidden.videos} videos
+              <br />
+              {hidden.shorts} Shorts
+            </span>
+          </>
+        ) : (
+          <small>Sin registro</small>
+        )}
       </div>
       <p className="statistics-note">
         YouTube suma el tiempo reproduciendo de cada pestaña, incluso en segundo

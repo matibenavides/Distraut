@@ -37,6 +37,15 @@ export interface UsageStatistics {
   shorts: number
   studyByDay: Record<string, number>
   playbackByDay?: Record<string, number>
+  hidden?: {
+    firstDay: string
+    byWeek: Record<string, HiddenCounts>
+  }
+}
+
+export interface HiddenCounts {
+  videos: number
+  shorts: number
 }
 
 export interface HiddenContent {

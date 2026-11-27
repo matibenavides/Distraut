@@ -1,4 +1,16 @@
-import { recordHiddenCounts, recordPlayback } from "./lib/storage"
+import {
+  initializeHiddenCounts,
+  recordHiddenCounts,
+  recordPlayback
+} from "./lib/storage"
+
+chrome.runtime.onInstalled.addListener(({ reason }) => {
+  if (reason === "install" || reason === "update") {
+    void initializeHiddenCounts().catch((error) =>
+      console.error("Distraut: no se pudo iniciar el recuento semanal.", error)
+    )
+  }
+})
 
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
   if (message?.type !== "record-hidden" && message?.type !== "record-playback")
