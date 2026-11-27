@@ -119,38 +119,65 @@ export function FeedSuggestions({ busy }: { busy: boolean }) {
               cuáles quieres ocultar.
             </p>
             <div className="feed-choices">
-              {(["keyword", "channel"] as const).map(
-                (type) =>
-                  choices.some((choice) => choice.type === type) && (
-                    <fieldset key={type} disabled={saving}>
-                      <legend>
-                        {type === "keyword" ? "Términos de títulos" : "Canales"}
-                      </legend>
-                      {choices.map(
-                        (choice, index) =>
-                          choice.type === type && (
-                            <Checkbox
-                              key={index}
-                              checked={selected.includes(index)}
-                              onChange={(event) => {
-                                const checked = event.target.checked
-                                setSelected((current) =>
-                                  checked
-                                    ? [...current, index]
-                                    : current.filter((id) => id !== index)
-                                )
-                              }}>
-                              {choice.value}{" "}
-                              <small>
-                                · {choice.count}{" "}
-                                {choice.count === 1 ? "video" : "videos"}
-                              </small>
-                            </Checkbox>
+              {(["keyword", "channel"] as const).map((type) => {
+                const group = choices
+                  .map((choice, index) => ({ choice, index }))
+                  .filter(({ choice }) => choice.type === type)
+                if (group.length === 0) return null
+                const ids = group.map(({ index }) => index)
+                const allSelected = ids.every((index) =>
+                  selected.includes(index)
+                )
+                const label =
+                  type === "keyword" ? "Términos de títulos" : "Canales"
+                const action = allSelected
+                  ? "Desmarcar todos"
+                  : "Seleccionar todos"
+
+                return (
+                  <fieldset
+                    key={type}
+                    disabled={saving}
+                    aria-labelledby={`feed-group-${type}`}>
+                    <div className="feed-group-heading">
+                      <strong id={`feed-group-${type}`}>{label}</strong>
+                      <Button
+                        type="link"
+                        size="small"
+                        disabled={saving}
+                        aria-label={`${action} · ${label}`}
+                        onClick={() => {
+                          setSelected((current) =>
+                            allSelected
+                              ? current.filter((index) => !ids.includes(index))
+                              : [...new Set([...current, ...ids])]
                           )
-                      )}
-                    </fieldset>
-                  )
-              )}
+                        }}>
+                        {action}
+                      </Button>
+                    </div>
+                    {group.map(({ choice, index }) => (
+                      <Checkbox
+                        key={index}
+                        checked={selected.includes(index)}
+                        onChange={(event) => {
+                          const checked = event.target.checked
+                          setSelected((current) =>
+                            checked
+                              ? [...current, index]
+                              : current.filter((id) => id !== index)
+                          )
+                        }}>
+                        {choice.value}{" "}
+                        <small>
+                          · {choice.count}{" "}
+                          {choice.count === 1 ? "video" : "videos"}
+                        </small>
+                      </Checkbox>
+                    ))}
+                  </fieldset>
+                )
+              })}
             </div>
             <label htmlFor="feed-collection-name">Nombre de la colección</label>
             <input

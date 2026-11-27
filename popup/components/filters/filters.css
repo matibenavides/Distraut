@@ -165,8 +165,16 @@
 .feed-choices fieldset + fieldset {
   margin-top: 10px;
 }
-.feed-choices legend {
-  font-weight: 600;
+.feed-group-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+}
+.feed-group-heading .ant-btn {
+  padding-inline: 0;
+  color: #624096;
   font-size: 12px;
 }
 .feed-choices .ant-checkbox-wrapper {
