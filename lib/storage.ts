@@ -4,6 +4,7 @@ import type {
   FilterType,
   StoredState
 } from "../types/filter"
+import { parseCollectionJson } from "./collection-json"
 import {
   createFilter,
   MAX_COLLECTION_NAME_LENGTH,
@@ -459,35 +460,65 @@ export function moveFiltersToCollection(
   )
 }
 
+function createCollection(
+  state: StoredState,
+  name: string,
+  createdFrom?: FilterType
+): FilterCollection {
+  if (
+    createdFrom !== undefined &&
+    createdFrom !== "keyword" &&
+    createdFrom !== "channel"
+  )
+    throw new Error("El origen de la colección no es compatible.")
+  const groups = state.collections ?? []
+  const normalized = normalizeFilterValue(name)
+  if (!normalized) throw new Error("Escribe un nombre para la colección.")
+  if (name.trim().length > MAX_COLLECTION_NAME_LENGTH)
+    throw new Error(
+      `El nombre de la colección admite hasta ${MAX_COLLECTION_NAME_LENGTH} caracteres.`
+    )
+  if (groups.some((group) => normalizeFilterValue(group.name) === normalized))
+    throw new Error("Ya existe una colección con ese nombre.")
+  const group: FilterCollection = {
+    id: crypto.randomUUID(),
+    name: name.trim(),
+    enabled: true
+  }
+  if (createdFrom !== undefined) group.createdFrom = createdFrom
+  return group
+}
+
 export function addCollection(
   name: string,
   selection?: FilterSelection,
   createdFrom?: FilterType
 ) {
   return updateState((state) => {
-    if (
-      createdFrom !== undefined &&
-      createdFrom !== "keyword" &&
-      createdFrom !== "channel"
-    )
-      throw new Error("El origen de la colección no es compatible.")
-    const groups = state.collections ?? []
-    const normalized = normalizeFilterValue(name)
-    if (!normalized) throw new Error("Escribe un nombre para la colección.")
-    if (name.trim().length > MAX_COLLECTION_NAME_LENGTH)
-      throw new Error(
-        `El nombre de la colección admite hasta ${MAX_COLLECTION_NAME_LENGTH} caracteres.`
-      )
-    if (groups.some((group) => normalizeFilterValue(group.name) === normalized))
-      throw new Error("Ya existe una colección con ese nombre.")
-    const group: FilterCollection = {
-      id: crypto.randomUUID(),
-      name: name.trim(),
-      enabled: true
+    const group = createCollection(state, name, createdFrom)
+    const next = {
+      ...state,
+      collections: [...(state.collections ?? []), group]
     }
-    if (createdFrom !== undefined) group.createdFrom = createdFrom
-    const next = { ...state, collections: [...groups, group] }
     return selection ? assignFilters(next, selection, group) : next
+  })
+}
+
+export async function importCollectionJson(text: string) {
+  const data = parseCollectionJson(text)
+  return updateState((state) => {
+    const group = createCollection(state, data.name, data.createdFrom)
+    group.enabled = data.enabled ?? true
+    const rules = data.filters.map((rule) => ({
+      ...rule,
+      id: crypto.randomUUID(),
+      collectionId: group.id
+    }))
+    return {
+      ...state,
+      collections: [...(state.collections ?? []), group],
+      filters: [...state.filters, ...rules]
+    }
   })
 }
 

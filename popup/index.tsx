@@ -17,6 +17,7 @@ import {
 } from "../lib/storage"
 import type { FilterCollection, StoredState } from "../types/filter"
 import { AddFilter } from "./components/filters/add-filter"
+import { CollectionJsonMenu } from "./components/filters/collection-json-menu"
 import { RuleLibrary } from "./components/filters/rule-library"
 import { StatisticsPanel } from "./components/statistics/statistics"
 import { StudySession } from "./components/study-session/study-session"
@@ -333,6 +334,9 @@ function IndexPopup() {
               ? `${selectionCount} ${selectionCount === 1 ? "filtro seleccionado" : "filtros seleccionados"}`
               : ""}
           </small>
+        )}
+        {view === "home" && state && (
+          <CollectionJsonMenu state={state} save={save} busy={busy} />
         )}
       </div>
       {inCollection && (

@@ -2,6 +2,10 @@ import assert from "node:assert/strict"
 import { beforeEach, test } from "node:test"
 
 import {
+  MAX_COLLECTION_JSON_BYTES,
+  serializeCollectionJson
+} from "../lib/collection-json"
+import {
   collectionVisibleForType,
   MAX_COLLECTION_NAME_LENGTH,
   orderedCollections
@@ -13,6 +17,7 @@ import {
   addFilter,
   endStudySession,
   getStoredState,
+  importCollectionJson,
   initializeHiddenCounts,
   moveFiltersToCollection,
   recordHiddenCounts,
@@ -31,6 +36,94 @@ import {
   useUntimedFiltering
 } from "../lib/storage"
 import type { StoredState } from "../types/filter"
+
+test("JSON conserva palabras, canales y pausas al exportar y volver a importar", async () => {
+  await addFilter("keyword", "deadlock")
+  const source = {
+    version: 1,
+    name: "Juegos",
+    enabled: false,
+    createdFrom: "keyword",
+    filters: [
+      { id: "externo", type: "keyword", value: "  deadlock ", enabled: false },
+      { type: "channel", value: "Riot Games" }
+    ]
+  }
+  const imported = await importCollectionJson(JSON.stringify(source))
+  const group = imported.collections![0]
+  assert.equal(group.enabled, false)
+  assert.equal(group.createdFrom, "keyword")
+  assert.deepEqual(
+    imported.filters.map((rule) => [
+      rule.type,
+      rule.value,
+      rule.enabled,
+      rule.collectionId
+    ]),
+    [
+      ["keyword", "deadlock", true, undefined],
+      ["keyword", "deadlock", false, group.id],
+      ["channel", "Riot Games", true, group.id]
+    ]
+  )
+  assert.notEqual(imported.filters[1].id, "externo")
+
+  const json = serializeCollectionJson(group, imported.filters)
+  await removeCollection(group.id)
+  const restored = await importCollectionJson(json)
+  assert.equal(
+    serializeCollectionJson(restored.collections![0], restored.filters),
+    json
+  )
+  assert.notEqual(restored.collections![0].id, group.id)
+})
+
+test("JSON rechazado y los fallos de escritura preservan las colecciones guardadas", async () => {
+  const before = await addCollection("Juegos")
+  const input = {
+    version: 1,
+    name: "Nueva",
+    filters: [{ type: "keyword", value: "Café" }]
+  }
+  await assert.rejects(importCollectionJson("{"), /JSON válido/)
+  await assert.rejects(
+    importCollectionJson(" ".repeat(MAX_COLLECTION_JSON_BYTES + 1)),
+    /máximo/
+  )
+  await assert.rejects(
+    importCollectionJson(JSON.stringify({ ...input, version: 2 })),
+    /version 1/
+  )
+  await assert.rejects(
+    importCollectionJson(JSON.stringify({ ...input, name: " Juégos " })),
+    /Ya existe/
+  )
+  await assert.rejects(
+    importCollectionJson(
+      JSON.stringify({
+        ...input,
+        filters: [...input.filters, { type: "channel", value: " " }]
+      })
+    ),
+    /vacío/
+  )
+  await assert.rejects(
+    importCollectionJson(
+      JSON.stringify({
+        ...input,
+        filters: [...input.filters, { type: "keyword", value: "CAFE" }]
+      })
+    ),
+    /duplicado/
+  )
+  await assert.rejects(
+    importCollectionJson(JSON.stringify({ ...input, enabled: "false" })),
+    /estado/
+  )
+  failWrite = true
+  await assert.rejects(importCollectionJson(JSON.stringify(input)), /guardar/)
+  assert.deepEqual(await getStoredState(), before)
+})
 
 test("intercambiar carpetas no cambia las intermedias, las reglas ni las pausas", async () => {
   const a = (await addCollection("Juegos")).collections![0]
