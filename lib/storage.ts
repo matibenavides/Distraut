@@ -4,7 +4,8 @@ import type {
   FilterType,
   StoredState
 } from "../types/filter"
-import { parseCollectionJson } from "./collection-json"
+import { parseCollectionJson, type CollectionDraft } from "./collection-json"
+import { parseCollectionList } from "./collection-list"
 import {
   createFilter,
   MAX_COLLECTION_NAME_LENGTH,
@@ -505,7 +506,22 @@ export function addCollection(
 }
 
 export async function importCollectionJson(text: string) {
-  const data = parseCollectionJson(text)
+  return saveCollectionDraft(parseCollectionJson(text))
+}
+
+export async function importCollectionList(
+  name: string,
+  text: string,
+  type: FilterType,
+  format?: "text" | "json"
+) {
+  return saveCollectionDraft({
+    name,
+    filters: parseCollectionList(text, type, format)
+  })
+}
+
+export function saveCollectionDraft(data: CollectionDraft) {
   return updateState((state) => {
     const group = createCollection(state, data.name, data.createdFrom)
     group.enabled = data.enabled ?? true

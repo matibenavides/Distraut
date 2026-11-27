@@ -18,6 +18,7 @@ import {
 import type { FilterCollection, StoredState } from "../types/filter"
 import { AddFilter } from "./components/filters/add-filter"
 import { CollectionJsonMenu } from "./components/filters/collection-json-menu"
+import { FeedSuggestions } from "./components/filters/feed-suggestions"
 import { RuleLibrary } from "./components/filters/rule-library"
 import { StatisticsPanel } from "./components/statistics/statistics"
 import { StudySession } from "./components/study-session/study-session"
@@ -336,7 +337,10 @@ function IndexPopup() {
           </small>
         )}
         {view === "home" && state && (
-          <CollectionJsonMenu state={state} save={save} busy={busy} />
+          <div className="filter-heading-actions">
+            <FeedSuggestions busy={busy} />
+            <CollectionJsonMenu state={state} save={save} busy={busy} />
+          </div>
         )}
       </div>
       {inCollection && (

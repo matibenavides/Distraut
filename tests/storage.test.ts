@@ -18,6 +18,7 @@ import {
   endStudySession,
   getStoredState,
   importCollectionJson,
+  importCollectionList,
   initializeHiddenCounts,
   moveFiltersToCollection,
   recordHiddenCounts,
@@ -36,6 +37,69 @@ import {
   useUntimedFiltering
 } from "../lib/storage"
 import type { StoredState } from "../types/filter"
+
+test("una lista de texto o JSON crea filtros del tipo elegido sin repetir entradas", async () => {
+  const words = await importCollectionList(
+    "Juegos",
+    "  Café \r\nCAFE\r\n\r\ndeadlock",
+    "keyword"
+  )
+  const channels = await importCollectionList(
+    "Canales",
+    '["Riot Games","riot games"]',
+    "channel"
+  )
+  const bracket = await importCollectionList(
+    "Etiquetas",
+    "[Guía]\n",
+    "keyword",
+    "text"
+  )
+  assert.deepEqual(
+    words.filters.map((rule) => [rule.type, rule.value]),
+    [
+      ["keyword", "Café"],
+      ["keyword", "deadlock"]
+    ]
+  )
+  assert.deepEqual(
+    channels.filters.slice(2).map((rule) => [rule.type, rule.value]),
+    [["channel", "Riot Games"]]
+  )
+  assert.equal(bracket.filters[3].value, "[Guía]")
+})
+
+test("un diccionario mixto conserva el tipo y la importación inválida no guarda datos", async () => {
+  const state = await importCollectionList(
+    "Mixta",
+    '{"palabras":["Riot"],"canales":["Riot","RIOT"]}',
+    "keyword"
+  )
+  assert.deepEqual(
+    state.filters.map((rule) => [rule.type, rule.value]),
+    [
+      ["keyword", "Riot"],
+      ["channel", "Riot"]
+    ]
+  )
+  await assert.rejects(
+    importCollectionList("Mixta", "otro", "keyword"),
+    /Ya existe/
+  )
+  await assert.rejects(
+    importCollectionList("Inválida", '{"palabras":["válida",4]}', "keyword"),
+    /debe ser texto/
+  )
+  await assert.rejects(
+    importCollectionList("Inválida", "[sin comillas]", "keyword", "json"),
+    /sintaxis/
+  )
+  await assert.rejects(
+    importCollectionList("Inválida", "   ", "keyword"),
+    /al menos/
+  )
+  assert.deepEqual(await getStoredState(), state)
+})
 
 test("JSON conserva palabras, canales y pausas al exportar y volver a importar", async () => {
   await addFilter("keyword", "deadlock")

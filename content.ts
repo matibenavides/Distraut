@@ -1,5 +1,6 @@
 import type { PlasmoCSConfig } from "plasmo"
 
+import { SCAN_YOUTUBE_FEED, scanYouTubeFeed } from "./lib/feed-suggestions"
 import { observePlayback } from "./lib/playback"
 import { getSessionTiming } from "./lib/session"
 import { createStatisticsRecorder } from "./lib/statistics"
@@ -11,6 +12,11 @@ export const config: PlasmoCSConfig = {
   matches: ["https://www.youtube.com/*"],
   css: ["styles/youtube.css"]
 }
+
+chrome.runtime.onMessage.addListener((message, sender, respond) => {
+  if (sender.id === chrome.runtime.id && message?.type === SCAN_YOUTUBE_FEED)
+    respond(scanYouTubeFeed(document))
+})
 
 observePlayback(document, async (start, end) => {
   const result = await chrome.runtime.sendMessage({

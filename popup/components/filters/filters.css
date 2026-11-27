@@ -150,6 +150,35 @@
   color: #624096;
   font-size: 12px;
 }
+.filter-heading-actions {
+  display: flex;
+  gap: 6px;
+}
+.feed-choices {
+  max-height: min(36vh, 220px);
+  overflow-y: auto;
+  margin-top: 10px;
+  padding: 8px;
+  border: 1px solid #e9e2ee;
+  border-radius: 8px;
+}
+.feed-choices fieldset + fieldset {
+  margin-top: 10px;
+}
+.feed-choices legend {
+  font-weight: 600;
+  font-size: 12px;
+}
+.feed-choices .ant-checkbox-wrapper {
+  display: flex;
+  align-items: start;
+  margin: 4px 0;
+  font-weight: 400;
+  overflow-wrap: anywhere;
+}
+.feed-choices .ant-checkbox-wrapper small {
+  display: inline;
+}
 .popup .chip-tab-name[data-over="true"] {
   color: #265b43;
   border-color: #43846c;

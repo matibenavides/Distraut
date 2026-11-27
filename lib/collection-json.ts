@@ -3,12 +3,15 @@ import { normalizeFilterValue } from "./filters"
 
 export const MAX_COLLECTION_JSON_BYTES = 1024 * 1024
 
-interface CollectionDocument {
-  version: 1
+export interface CollectionDraft {
   name: string
   enabled?: boolean
   createdFrom?: FilterType
   filters: Pick<Filter, "type" | "value" | "enabled">[]
+}
+
+interface CollectionDocument extends CollectionDraft {
+  version: 1
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -19,9 +22,13 @@ function isFilterType(value: unknown): value is FilterType {
   return value === "keyword" || value === "channel"
 }
 
-export function parseCollectionJson(text: string): CollectionDocument {
+export function validateCollectionTextSize(text: string) {
   if (new TextEncoder().encode(text).length > MAX_COLLECTION_JSON_BYTES)
-    throw new Error("El archivo supera el máximo de 1 MiB.")
+    throw new Error("El contenido supera el máximo de 1 MiB.")
+}
+
+export function parseCollectionJson(text: string): CollectionDocument {
+  validateCollectionTextSize(text)
   let data: unknown
   try {
     data = JSON.parse(text.replace(/^\uFEFF/, ""))

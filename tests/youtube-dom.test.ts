@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import { test } from "node:test"
 import { parseHTML } from "linkedom"
 
+import { scanYouTubeFeed, suggestFeedFilters } from "../lib/feed-suggestions"
 import {
   applyVideoFilters,
   findVideoCards,
@@ -23,6 +24,52 @@ const lockup = (title: string, channel: string) => `
 `
 
 const short = `<ytm-shorts-lockup-view-model-v2><ytm-shorts-lockup-view-model><a href="/shorts/abc">Short</a></ytm-shorts-lockup-view-model></ytm-shorts-lockup-view-model-v2>`
+
+test("sugerencias del feed cuentan videos distintos y respetan tarjetas ocultas", () => {
+  const first = lockup("League of Legends: guía", "Riot Games")
+  const second = lockup("League of Legends: partida", "RIOT GAMES").replace(
+    "v=abc",
+    "v=def"
+  )
+  const hidden = lockup("Contenido ocultado", "Canal oculto").replace(
+    "v=abc",
+    "v=hidden"
+  )
+  const { document } = parseHTML(`<ytd-watch-next-secondary-results-renderer>
+    ${first}${first}${second}<div class="distraut-suggested-hidden">${hidden}</div>${short}
+    </ytd-watch-next-secondary-results-renderer>`)
+  for (const card of findVideoCards(document))
+    Object.defineProperty(card, "getClientRects", { value: () => [{}] })
+  const scan = scanYouTubeFeed(document)
+  assert.equal(scan.videos, 2)
+  assert.deepEqual(scan.suggestions[0], {
+    type: "keyword",
+    value: "league of legends",
+    count: 2
+  })
+  assert.deepEqual(
+    scan.suggestions.filter((item) => item.type === "channel"),
+    [{ type: "channel", value: "Riot Games", count: 2 }]
+  )
+  assert.ok(scan.suggestions.every((item) => !item.value.includes("ocult")))
+  assert.ok(scan.suggestions.every((item) => item.value !== "league"))
+})
+
+test("sugerencias omiten palabras comunes y cuentan un mismo término una vez por video", () => {
+  const result = suggestFeedFilters([
+    { title: "El video de café CAFÉ y café" },
+    { title: "Cafe con música" }
+  ])
+  assert.ok(
+    result.suggestions.some((item) => item.value === "cafe" && item.count === 2)
+  )
+  assert.ok(
+    result.suggestions.every(
+      (item) => !["video", "con", "el"].includes(item.value)
+    )
+  )
+  assert.deepEqual(suggestFeedFilters([]), { videos: 0, suggestions: [] })
+})
 
 test("oculta sugeridos reversiblemente y conserva player, chat, listas y otros filtros", () => {
   const { document } = parseHTML(

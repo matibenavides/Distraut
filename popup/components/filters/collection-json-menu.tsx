@@ -10,6 +10,7 @@ import { orderedCollections } from "../../../lib/filters"
 import { importCollectionJson } from "../../../lib/storage"
 import type { StoredState } from "../../../types/filter"
 import type { Save } from "../../types"
+import { ImportCollectionList } from "./import-collection-list"
 
 export function CollectionJsonMenu({
   state,
@@ -22,6 +23,7 @@ export function CollectionJsonMenu({
 }) {
   const fileInput = useRef<HTMLInputElement>(null)
   const [exportId, setExportId] = useState<string>()
+  const [importingList, setImportingList] = useState(false)
   const [notice, holder] = message.useMessage()
   const groups = orderedCollections(state.collections)
   const selected = groups.find((group) => group.id === exportId)
@@ -34,6 +36,7 @@ export function CollectionJsonMenu({
         disabled={busy}
         menu={{
           items: [
+            { key: "list", label: "Importar lista" },
             { key: "import", label: "Importar colección" },
             {
               key: "export",
@@ -42,7 +45,8 @@ export function CollectionJsonMenu({
             }
           ],
           onClick: ({ key }) => {
-            if (key === "import") fileInput.current?.click()
+            if (key === "list") setImportingList(true)
+            else if (key === "import") fileInput.current?.click()
             else setExportId(groups[0]?.id)
           }
         }}>
@@ -80,9 +84,24 @@ export function CollectionJsonMenu({
               return importCollectionJson(text)
             })
           )
-            void notice.success("Colección importada.")
+            void notice.success({
+              key: "import-collection",
+              content: "Colección importada."
+            })
         }}
       />
+      {importingList && (
+        <ImportCollectionList
+          onClose={() => setImportingList(false)}
+          onImported={() => {
+            setImportingList(false)
+            void notice.success({
+              key: "import-collection",
+              content: "Colección importada."
+            })
+          }}
+        />
+      )}
       <Modal
         open={exportId !== undefined}
         title="Exportar colección"
