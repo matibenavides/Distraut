@@ -199,6 +199,18 @@
 .collection-chips .filter-chip {
   padding: 4px 8px;
 }
+.empty-collection {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.popup .empty-collection .ant-btn {
+  padding-inline: 0;
+  color: #872342;
+  font-size: 12px;
+}
 .chip-tabs {
   margin-top: 6px;
 }

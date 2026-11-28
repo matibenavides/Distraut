@@ -131,9 +131,35 @@ function IndexPopup() {
     }
   }
   function openRules(id = "") {
+    setDeleting("")
     setOrigin(id)
     setFromCollections(view === "collections")
     setView("rules")
+  }
+  function collectionRemoval(
+    group: FilterCollection,
+    empty: boolean,
+    onRemoved?: () => void
+  ) {
+    async function remove(onlyIfEmpty: boolean) {
+      if (await save(() => removeCollection(group.id, { onlyIfEmpty }))) {
+        setDeleting("")
+        onRemoved?.()
+      }
+    }
+    return !empty && deleting === group.id ? (
+      <div className="row">
+        <span>¿Eliminar con sus filtros?</span>
+        <button onClick={() => setDeleting("")}>Cancelar</button>
+        <button onClick={() => remove(false)}>Eliminar</button>
+      </div>
+    ) : (
+      <button
+        aria-label={`Eliminar colección ${group.name}`}
+        onClick={() => (empty ? void remove(true) : setDeleting(group.id))}>
+        Eliminar colección
+      </button>
+    )
   }
   const groups = orderedCollections(state?.collections)
   function collectionRow(group: FilterCollection, index = 0) {
@@ -182,26 +208,8 @@ function IndexPopup() {
             </button>
           </div>
         )}
-        {view === "collections" &&
-          (deleting === group.id ? (
-            <div className="row">
-              <span>¿Eliminar con sus filtros?</span>
-              <button onClick={() => setDeleting("")}>Cancelar</button>
-              <button
-                onClick={async () => {
-                  if (await save(() => removeCollection(group.id)))
-                    setDeleting("")
-                }}>
-                Eliminar
-              </button>
-            </div>
-          ) : (
-            <button
-              aria-label={`Eliminar ${group.name}`}
-              onClick={() => setDeleting(group.id)}>
-              Eliminar colección
-            </button>
-          ))}
+        {(view === "collections" || rules.length === 0) &&
+          collectionRemoval(group, rules.length === 0)}
       </div>
     )
   }
@@ -338,16 +346,11 @@ function IndexPopup() {
         )}
         {view === "home" && state && (
           <div className="filter-heading-actions">
-            <FeedSuggestions busy={busy} />
+            <FeedSuggestions busy={busy} collections={state.collections} />
             <CollectionJsonMenu state={state} save={save} busy={busy} />
           </div>
         )}
       </div>
-      {inCollection && (
-        <p className="collection-context">
-          Estás editando la colección <strong>{inCollection.name}</strong>
-        </p>
-      )}
       {feedback}
       {state && (
         <fieldset disabled={busy} aria-busy={busy}>
@@ -412,12 +415,22 @@ function IndexPopup() {
             </>
           )}
           {view === "rules" && (
-            <RuleLibrary
-              key={inCollection?.id ?? "all"}
-              state={state}
-              initialOrigin={inCollection?.id ?? ""}
-              save={save}
-            />
+            <>
+              {inCollection &&
+                collectionRemoval(
+                  inCollection,
+                  !state.filters.some(
+                    (rule) => rule.collectionId === inCollection.id
+                  ),
+                  () => setView(fromCollections ? "collections" : "home")
+                )}
+              <RuleLibrary
+                key={inCollection?.id ?? "all"}
+                state={state}
+                initialOrigin={inCollection?.id ?? ""}
+                save={save}
+              />
+            </>
           )}
         </fieldset>
       )}

@@ -20,6 +20,7 @@ import {
   addCollection,
   addFilter,
   moveFiltersToCollection,
+  removeCollection,
   removeFilter,
   swapCollections
 } from "../../../lib/storage"
@@ -172,7 +173,8 @@ function FilterGroup({
               setMessage("")
             }}
           />
-          <button style={{ paddingBottom: "4px", fontWeight: "bold" }}
+          <button
+            style={{ paddingBottom: "4px", fontWeight: "bold" }}
             className="primary"
             aria-label={keyword ? "Añadir palabra clave" : "Añadir canal"}>
             <span aria-hidden="true">+</span>
@@ -360,12 +362,37 @@ function FilterGroup({
                       .get(group.id)!
                       .map((rule) => renderChip(rule, group))}
                   </ul>
-                ) : (
+                ) : state.filters.some(
+                    (rule) => rule.collectionId === group.id
+                  ) ? (
                   <small>
                     {keyword
                       ? "Sin palabras en esta colección."
                       : "Sin canales en esta colección."}
                   </small>
+                ) : (
+                  <div className="empty-collection">
+                    <small>Colección vacía</small>
+                    <Button
+                      type="link"
+                      size="small"
+                      danger
+                      disabled={busy}
+                      aria-label={`Eliminar colección ${group.name}`}
+                      onClick={async () => {
+                        setMessage("")
+                        if (
+                          await save(() =>
+                            removeCollection(group.id, { onlyIfEmpty: true })
+                          )
+                        ) {
+                          setActiveGroup("")
+                          setMessage(`Se eliminó la colección «${group.name}».`)
+                        }
+                      }}>
+                      Eliminar colección
+                    </Button>
+                  </div>
                 )}
               </>
             )

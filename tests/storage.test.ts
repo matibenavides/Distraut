@@ -25,6 +25,7 @@ import {
   recordPlayback,
   removeCollection,
   removeFilter,
+  saveFeedSuggestions,
   setCollectionEnabled,
   setFilterEnabled,
   setFilteringEnabled,
@@ -37,6 +38,79 @@ import {
   useUntimedFiltering
 } from "../lib/storage"
 import type { StoredState } from "../types/filter"
+
+test("el escaneo añade solo filtros nuevos a una colección existente", async () => {
+  await addFilter("keyword", "Déádlock")
+  const destination = (await addCollection("Distracciones")).collections![0]
+  const other = (await addCollection("Juegos")).collections![1]
+  await addFilter("keyword", "deadlock", other.id)
+  await addFilter("channel", "Ríot Games", other.id)
+  await setCollectionEnabled(other.id, false)
+  const before = await setCollectionEnabled(destination.id, false)
+
+  const added = await saveFeedSuggestions(
+    [
+      { type: "keyword", value: " DEADLOCK " },
+      { type: "channel", value: "riot games" },
+      { type: "channel", value: "Deadlock" },
+      { type: "channel", value: "DEADLOCK" }
+    ],
+    { id: destination.id }
+  )
+  const after = await getStoredState()
+  assert.equal(added, 1)
+  assert.deepEqual(after.collections, before.collections)
+  assert.deepEqual(after.filters.slice(0, -1), before.filters)
+  assert.equal(after.filters.at(-1)?.value, "Deadlock")
+  assert.equal(after.filters.at(-1)?.collectionId, destination.id)
+  assert.equal(shouldHideVideo(after, { channelName: "Deadlock" }), false)
+  await assert.rejects(
+    saveFeedSuggestions([{ type: "keyword", value: "deadlock" }], {
+      name: "Nueva"
+    }),
+    /ya están guardados/
+  )
+  assert.deepEqual(await getStoredState(), after)
+})
+
+test("el escaneo puede crear una colección con solo las sugerencias nuevas", async () => {
+  await addFilter("keyword", "React")
+  const suggestions = [
+    { type: "keyword", value: "react" },
+    { type: "keyword", value: "typescript" }
+  ] as const
+  assert.equal(
+    await saveFeedSuggestions(suggestions, { name: "Programación" }),
+    1
+  )
+  const state = await getStoredState()
+  assert.equal(state.collections?.[0].name, "Programación")
+  assert.equal(state.filters[1].value, "typescript")
+  assert.equal(state.filters[1].collectionId, state.collections?.[0].id)
+  await assert.rejects(
+    saveFeedSuggestions([{ type: "keyword", value: "vue" }], {
+      id: "eliminada"
+    }),
+    /No se encontró la colección/
+  )
+  assert.deepEqual(await getStoredState(), state)
+})
+
+test("el atajo para eliminar una carpeta vacía comprueba ambos tipos al guardar", async () => {
+  const group = (await addCollection("Vacía", undefined, "keyword"))
+    .collections![0]
+  const state = await addFilter("channel", "Un canal", group.id)
+  await assert.rejects(
+    removeCollection(group.id, { onlyIfEmpty: true }),
+    /ya tiene filtros/
+  )
+  assert.deepEqual(await getStoredState(), state)
+  await removeFilter(state.filters[0].id)
+  assert.deepEqual(
+    (await removeCollection(group.id, { onlyIfEmpty: true })).collections,
+    []
+  )
+})
 
 test("una lista de texto o JSON crea filtros del tipo elegido sin repetir entradas", async () => {
   const words = await importCollectionList(

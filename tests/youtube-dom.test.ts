@@ -71,6 +71,32 @@ test("sugerencias omiten palabras comunes y cuentan un mismo término una vez po
   assert.deepEqual(suggestFeedFilters([]), { videos: 0, suggestions: [] })
 })
 
+test("el escaneo descarta filtros guardados antes del límite de sugerencias", () => {
+  const videos = Array.from({ length: 13 }, (_, index) => ({
+    title: `Termino${index}`,
+    channelName: `Canal ${index}`
+  }))
+  const result = suggestFeedFilters(videos, [
+    { id: "k", type: "keyword", value: " Término0 ", enabled: false },
+    {
+      id: "c",
+      type: "channel",
+      value: "CÁNAL 0",
+      enabled: true,
+      collectionId: "grupo"
+    },
+    { id: "other-type", type: "channel", value: "Termino12", enabled: true }
+  ])
+  assert.equal(result.suggestions.length, 24)
+  assert.ok(
+    result.suggestions.every(
+      ({ value }) => value !== "termino0" && value !== "Canal 0"
+    )
+  )
+  assert.ok(result.suggestions.some(({ value }) => value === "termino12"))
+  assert.ok(result.suggestions.some(({ value }) => value === "Canal 12"))
+})
+
 test("oculta sugeridos reversiblemente y conserva player, chat, listas y otros filtros", () => {
   const { document } = parseHTML(
     `<div id="movie_player"><video></video></div><div id="chat"></div><ytd-playlist-panel-renderer></ytd-playlist-panel-renderer><ytd-watch-next-secondary-results-renderer>${lockup("React", "Canal")}${short}</ytd-watch-next-secondary-results-renderer><ytd-search><ytd-video-renderer is-search><a id="video-title" href="/watch?v=other">React</a></ytd-video-renderer></ytd-search>`

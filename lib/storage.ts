@@ -8,6 +8,7 @@ import { parseCollectionJson, type CollectionDraft } from "./collection-json"
 import { parseCollectionList } from "./collection-list"
 import {
   createFilter,
+  filterKey,
   MAX_COLLECTION_NAME_LENGTH,
   normalizeFilterValue
 } from "./filters"
@@ -424,18 +425,19 @@ function assignFilters(
   )
     throw new Error("La selección cambió. Revisa los filtros seleccionados.")
 
-  const key = (rule: Filter) =>
-    rule.type + ":" + normalizeFilterValue(rule.value)
   const existing = new Set(
-    state.filters.filter((rule) => rule.collectionId === group?.id).map(key)
+    state.filters
+      .filter((rule) => rule.collectionId === group?.id)
+      .map(filterKey)
   )
   for (const rule of rules) {
     if (rule.collectionId === group?.id) continue
-    if (existing.has(key(rule)))
+    const key = filterKey(rule)
+    if (existing.has(key))
       throw new Error(
         `El filtro «${rule.value}» ya existe en el destino o se repite en la selección. Revisa la selección para moverla a «${group?.name ?? "Individuales"}».`
       )
-    existing.add(key(rule))
+    existing.add(key)
   }
   return {
     ...state,
@@ -538,6 +540,43 @@ export function saveCollectionDraft(data: CollectionDraft) {
   })
 }
 
+export async function saveFeedSuggestions(
+  suggestions: readonly Pick<Filter, "type" | "value">[],
+  destination: { id: string } | { name: string }
+) {
+  let added = 0
+  await updateState((state) => {
+    const existing = new Set(state.filters.map(filterKey))
+    const newRules: Filter[] = []
+    for (const suggestion of suggestions) {
+      const key = filterKey(suggestion)
+      if (existing.has(key)) continue
+      newRules.push(createFilter(suggestion.type, suggestion.value, []))
+      existing.add(key)
+    }
+    if (!newRules.length)
+      throw new Error("Los filtros seleccionados ya están guardados.")
+
+    const group =
+      "id" in destination
+        ? requireCollection(state, destination.id)
+        : createCollection(state, destination.name)
+    added = newRules.length
+    return {
+      ...state,
+      collections:
+        "id" in destination
+          ? state.collections
+          : [...(state.collections ?? []), group],
+      filters: [
+        ...state.filters,
+        ...newRules.map((rule) => ({ ...rule, collectionId: group.id }))
+      ]
+    }
+  })
+  return added
+}
+
 export function swapCollections(sourceId: string, targetId: string) {
   return updateState((state) => {
     const source = requireCollection(state, sourceId)
@@ -563,9 +602,16 @@ export function setCollectionEnabled(id: string, enabled: boolean) {
   })
 }
 
-export function removeCollection(id: string) {
+export function removeCollection(id: string, { onlyIfEmpty = false } = {}) {
   return updateState((state) => {
     requireCollection(state, id)
+    if (
+      onlyIfEmpty &&
+      state.filters.some((filter) => filter.collectionId === id)
+    )
+      throw new Error(
+        "La colección ya tiene filtros. Revisa su contenido antes de eliminarla."
+      )
     return {
       ...state,
       collections: state.collections!.filter((group) => group.id !== id),

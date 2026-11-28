@@ -3,15 +3,26 @@ import { Button, Checkbox, message, Modal, Spin } from "antd"
 import { useState } from "react"
 
 import { SCAN_YOUTUBE_FEED, type FeedScan } from "../../../lib/feed-suggestions"
-import { MAX_COLLECTION_NAME_LENGTH } from "../../../lib/filters"
-import { saveCollectionDraft } from "../../../lib/storage"
+import {
+  MAX_COLLECTION_NAME_LENGTH,
+  orderedCollections
+} from "../../../lib/filters"
+import { saveFeedSuggestions } from "../../../lib/storage"
+import type { FilterCollection } from "../../../types/filter"
 
-export function FeedSuggestions({ busy }: { busy: boolean }) {
+export function FeedSuggestions({
+  busy,
+  collections
+}: {
+  busy: boolean
+  collections?: FilterCollection[]
+}) {
   const [open, setOpen] = useState(false)
   const [scanning, setScanning] = useState(false)
   const [saving, setSaving] = useState(false)
   const [result, setResult] = useState<FeedScan>()
   const [selected, setSelected] = useState<number[]>([])
+  const [collectionId, setCollectionId] = useState("")
   const [name, setName] = useState("")
   const [error, setError] = useState("")
   const [notice, holder] = message.useMessage()
@@ -22,6 +33,7 @@ export function FeedSuggestions({ busy }: { busy: boolean }) {
     setError("")
     setResult(undefined)
     setSelected([])
+    setCollectionId("")
     setName("")
     try {
       const [tab] = await chrome.tabs.query({
@@ -46,6 +58,10 @@ export function FeedSuggestions({ busy }: { busy: boolean }) {
   }
 
   const choices = result?.suggestions ?? []
+  const groups = orderedCollections(collections)
+  const group = groups.find(({ id }) => id === collectionId)
+  const canSave =
+    (collectionId ? !!group : !!name.trim()) && selected.length > 0 && !busy
 
   return (
     <>
@@ -65,31 +81,33 @@ export function FeedSuggestions({ busy }: { busy: boolean }) {
         centered
         width={376}
         title="Escanear filtros"
-        okText="Crear colección"
+        okText={collectionId ? "Añadir a colección" : "Crear colección"}
         cancelText="Cerrar"
         confirmLoading={saving}
         cancelButtonProps={{ disabled: saving }}
-        okButtonProps={{
-          disabled: !name.trim() || selected.length === 0 || busy
-        }}
+        okButtonProps={{ disabled: !canSave }}
         onCancel={() => {
           if (!saving) setOpen(false)
         }}
         onOk={async () => {
-          if (!name.trim() || !selected.length || saving || busy) return
+          if (!canSave || saving) return
           setSaving(true)
           setError("")
           try {
-            await saveCollectionDraft({
-              name,
-              filters: selected.map((index) => ({
-                type: choices[index].type,
-                value: choices[index].value,
-                enabled: true
-              }))
-            })
+            const added = await saveFeedSuggestions(
+              selected.map((index) => choices[index]),
+              group ? { id: group.id } : { name }
+            )
             setOpen(false)
-            void notice.success("Colección creada.")
+            const count =
+              added === 1 ? "1 filtro añadido" : `${added} filtros añadidos`
+            const skipped =
+              added < selected.length
+                ? " Se omitieron filtros que ya estaban guardados."
+                : ""
+            void notice.success(
+              `${count} a «${group?.name ?? name.trim()}».${skipped}`
+            )
           } catch (err) {
             setError(
               err instanceof Error
@@ -107,8 +125,9 @@ export function FeedSuggestions({ busy }: { busy: boolean }) {
         )}
         {result && !choices.length && (
           <p role="status">
-            No hay sugerencias. Abre Inicio de YouTube o una búsqueda con videos
-            cargados y vuelve a escanear.
+            {result.videos
+              ? "No encontramos filtros nuevos en los videos cargados."
+              : "No hay sugerencias. Abre Inicio de YouTube o una búsqueda con videos cargados y vuelve a escanear."}
           </p>
         )}
         {choices.length > 0 && (
@@ -179,18 +198,50 @@ export function FeedSuggestions({ busy }: { busy: boolean }) {
                 )
               })}
             </div>
-            <label htmlFor="feed-collection-name">Nombre de la colección</label>
-            <input
-              id="feed-collection-name"
-              maxLength={MAX_COLLECTION_NAME_LENGTH}
-              value={name}
-              placeholder="Ej. Distracciones"
-              disabled={saving}
-              onChange={(event) => {
-                setName(event.target.value)
-                setError("")
-              }}
-            />
+            {(groups.length > 0 || collectionId) && (
+              <>
+                <label htmlFor="feed-collection-destination">Guardar en</label>
+                <select
+                  id="feed-collection-destination"
+                  value={collectionId}
+                  disabled={saving}
+                  onChange={(event) => {
+                    setCollectionId(event.target.value)
+                    setError("")
+                  }}>
+                  <option value="">Nueva colección</option>
+                  {collectionId && !group && (
+                    <option value={collectionId} disabled>
+                      Colección eliminada
+                    </option>
+                  )}
+                  {groups.map(({ id, name, enabled }) => (
+                    <option key={id} value={id}>
+                      {name}
+                      {!enabled && " (en pausa)"}
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
+            {!collectionId && (
+              <>
+                <label htmlFor="feed-collection-name">
+                  Nombre de la colección
+                </label>
+                <input
+                  id="feed-collection-name"
+                  maxLength={MAX_COLLECTION_NAME_LENGTH}
+                  value={name}
+                  placeholder="Ej. Distracciones"
+                  disabled={saving}
+                  onChange={(event) => {
+                    setName(event.target.value)
+                    setError("")
+                  }}
+                />
+              </>
+            )}
           </>
         )}
         {error && (

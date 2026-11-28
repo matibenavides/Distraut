@@ -15,7 +15,7 @@ export const config: PlasmoCSConfig = {
 
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
   if (sender.id === chrome.runtime.id && message?.type === SCAN_YOUTUBE_FEED)
-    respond(scanYouTubeFeed(document))
+    respond(scanYouTubeFeed(document, currentState?.filters))
 })
 
 observePlayback(document, async (start, end) => {

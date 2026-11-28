@@ -1,5 +1,5 @@
-import type { FilterType, VideoMetadata } from "../types/filter"
-import { normalizeFilterValue } from "./filters"
+import type { Filter, FilterType, VideoMetadata } from "../types/filter"
+import { filterKey, normalizeFilterValue } from "./filters"
 import { findVideoCards, readVideoMetadata } from "./youtube-dom"
 
 export const SCAN_YOUTUBE_FEED = "scan-youtube-feed"
@@ -43,7 +43,11 @@ function titleTerms(title: string) {
   return terms
 }
 
-export function suggestFeedFilters(videos: readonly VideoMetadata[]): FeedScan {
+export function suggestFeedFilters(
+  videos: readonly VideoMetadata[],
+  filters: readonly Filter[] = []
+): FeedScan {
+  const existing = new Set(filters.map(filterKey))
   const terms = new Map<string, FeedSuggestion>()
   const channels = new Map<string, FeedSuggestion>()
   for (const { title, channelName } of videos) {
@@ -62,7 +66,11 @@ export function suggestFeedFilters(videos: readonly VideoMetadata[]): FeedScan {
   }
   const keywords: FeedSuggestion[] = []
   const ranked = [...terms.values()]
-    .filter(({ value, count }) => count > 1 || !/\s/u.test(value))
+    .filter(
+      (term) =>
+        !existing.has(filterKey(term)) &&
+        (term.count > 1 || !/\s/u.test(term.value))
+    )
     .sort(
       (a, b) =>
         b.count - a.count ||
@@ -84,12 +92,18 @@ export function suggestFeedFilters(videos: readonly VideoMetadata[]): FeedScan {
     videos: videos.length,
     suggestions: [
       ...keywords,
-      ...[...channels.values()].sort((a, b) => b.count - a.count).slice(0, 12)
+      ...[...channels.values()]
+        .filter((channel) => !existing.has(filterKey(channel)))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 12)
     ]
   }
 }
 
-export function scanYouTubeFeed(root: ParentNode): FeedScan {
+export function scanYouTubeFeed(
+  root: ParentNode,
+  filters: readonly Filter[] = []
+): FeedScan {
   const videos = new Map<string, VideoMetadata>()
   for (const card of findVideoCards(root)) {
     if (
@@ -106,5 +120,5 @@ export function scanYouTubeFeed(root: ParentNode): FeedScan {
     const metadata = readVideoMetadata(card)
     if (metadata.title || metadata.channelName) videos.set(id, metadata)
   }
-  return suggestFeedFilters([...videos.values()])
+  return suggestFeedFilters([...videos.values()], filters)
 }

@@ -29,6 +29,10 @@ export function normalizeFilterValue(value: string): string {
     .trim()
 }
 
+export function filterKey({ type, value }: Pick<Filter, "type" | "value">) {
+  return `${type}:${normalizeFilterValue(value)}`
+}
+
 export function createFilter(
   type: FilterType,
   value: string,
