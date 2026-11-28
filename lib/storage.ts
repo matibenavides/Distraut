@@ -4,8 +4,7 @@ import type {
   FilterType,
   StoredState
 } from "../types/filter"
-import { parseCollectionJson, type CollectionDraft } from "./collection-json"
-import { parseCollectionList } from "./collection-list"
+import { parseCollectionsJson } from "./collection-json"
 import {
   createFilter,
   filterKey,
@@ -482,7 +481,7 @@ function createCollection(
       `El nombre de la colección admite hasta ${MAX_COLLECTION_NAME_LENGTH} caracteres.`
     )
   if (groups.some((group) => normalizeFilterValue(group.name) === normalized))
-    throw new Error("Ya existe una colección con ese nombre.")
+    throw new Error(`Ya existe una colección con el nombre «${name.trim()}».`)
   const group: FilterCollection = {
     id: crypto.randomUUID(),
     name: name.trim(),
@@ -508,35 +507,25 @@ export function addCollection(
 }
 
 export async function importCollectionJson(text: string) {
-  return saveCollectionDraft(parseCollectionJson(text))
-}
-
-export async function importCollectionList(
-  name: string,
-  text: string,
-  type: FilterType,
-  format?: "text" | "json"
-) {
-  return saveCollectionDraft({
-    name,
-    filters: parseCollectionList(text, type, format)
-  })
-}
-
-export function saveCollectionDraft(data: CollectionDraft) {
+  const drafts = parseCollectionsJson(text)
   return updateState((state) => {
-    const group = createCollection(state, data.name, data.createdFrom)
-    group.enabled = data.enabled ?? true
-    const rules = data.filters.map((rule) => ({
-      ...rule,
-      id: crypto.randomUUID(),
-      collectionId: group.id
-    }))
-    return {
+    const next = {
       ...state,
-      collections: [...(state.collections ?? []), group],
-      filters: [...state.filters, ...rules]
+      collections: [...(state.collections ?? [])],
+      filters: [...state.filters]
     }
+    for (const draft of drafts) {
+      const group = createCollection(next, draft.name, draft.createdFrom)
+      group.enabled = draft.enabled ?? true
+      next.collections.push(group)
+      for (const rule of draft.filters)
+        next.filters.push({
+          ...rule,
+          id: crypto.randomUUID(),
+          collectionId: group.id
+        })
+    }
+    return next
   })
 }
 

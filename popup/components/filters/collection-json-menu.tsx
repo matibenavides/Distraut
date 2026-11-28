@@ -4,13 +4,13 @@ import { useRef, useState } from "react"
 
 import {
   MAX_COLLECTION_JSON_BYTES,
-  serializeCollectionJson
+  serializeCollectionJson,
+  serializeCollectionsJson
 } from "../../../lib/collection-json"
 import { orderedCollections } from "../../../lib/filters"
 import { importCollectionJson } from "../../../lib/storage"
 import type { StoredState } from "../../../types/filter"
 import type { Save } from "../../types"
-import { ImportCollectionList } from "./import-collection-list"
 
 export function CollectionJsonMenu({
   state,
@@ -23,10 +23,14 @@ export function CollectionJsonMenu({
 }) {
   const fileInput = useRef<HTMLInputElement>(null)
   const [exportId, setExportId] = useState<string>()
-  const [importingList, setImportingList] = useState(false)
   const [notice, holder] = message.useMessage()
-  const groups = orderedCollections(state.collections)
-  const selected = groups.find((group) => group.id === exportId)
+  const collections = state.collections ?? []
+  const groups = orderedCollections(collections)
+  const selected = exportId
+    ? groups.find((group) => group.id === exportId)
+    : undefined
+  const exportAll = exportId === ""
+  const canExport = groups.length > 0 && (exportAll || !!selected)
 
   return (
     <>
@@ -36,17 +40,15 @@ export function CollectionJsonMenu({
         disabled={busy}
         menu={{
           items: [
-            { key: "list", label: "Importar lista" },
-            { key: "import", label: "Importar colección" },
+            { key: "import", label: "Importar colecciones" },
             {
               key: "export",
-              label: "Exportar colección",
+              label: "Exportar colecciones",
               disabled: !groups.length
             }
           ],
           onClick: ({ key }) => {
-            if (key === "list") setImportingList(true)
-            else if (key === "import") fileInput.current?.click()
+            if (key === "import") fileInput.current?.click()
             else setExportId(groups[0]?.id)
           }
         }}>
@@ -65,7 +67,7 @@ export function CollectionJsonMenu({
         ref={fileInput}
         type="file"
         accept=".json,application/json"
-        aria-label="Archivo JSON de colección"
+        aria-label="Archivo JSON de colecciones"
         style={{ display: "none" }}
         onChange={async (event) => {
           const file = event.currentTarget.files?.[0]
@@ -86,59 +88,51 @@ export function CollectionJsonMenu({
           )
             void notice.success({
               key: "import-collection",
-              content: "Colección importada."
+              content: "Archivo importado."
             })
         }}
       />
-      {importingList && (
-        <ImportCollectionList
-          onClose={() => setImportingList(false)}
-          onImported={() => {
-            setImportingList(false)
-            void notice.success({
-              key: "import-collection",
-              content: "Colección importada."
-            })
-          }}
-        />
-      )}
       <Modal
         open={exportId !== undefined}
-        title="Exportar colección"
+        title="Exportar colecciones"
         width={340}
         centered
         okText="Descargar archivo"
         cancelText="Cancelar"
-        okButtonProps={{ disabled: !selected || busy }}
+        okButtonProps={{ disabled: !canExport || busy }}
         onCancel={() => setExportId(undefined)}
         onOk={() => {
-          if (!selected) return
-          const blob = new Blob(
-            [serializeCollectionJson(selected, state.filters)],
-            { type: "application/json" }
-          )
+          if (!canExport || busy) return
+          const json = selected
+            ? serializeCollectionJson(selected, state.filters)
+            : serializeCollectionsJson(collections, state.filters)
+          const blob = new Blob([json], { type: "application/json" })
           if (blob.size > MAX_COLLECTION_JSON_BYTES) {
-            void notice.error("La colección supera el máximo de 1 MiB.")
+            void notice.error("El archivo supera el máximo de 1 MiB.")
             return
           }
           const url = URL.createObjectURL(blob)
           const link = document.createElement("a")
           link.href = url
-          link.download = `distraut-${selected.name.replace(/[<>:"/\\|?*\u0000-\u001f]/g, "-")}.json`
+          const name =
+            selected?.name.replace(/[<>:"/\\|?*\u0000-\u001f]/g, "-") ??
+            "colecciones"
+          link.download = `distraut-${name}.json`
           link.click()
           setTimeout(() => URL.revokeObjectURL(url), 1000)
           setExportId(undefined)
         }}>
-        <label htmlFor="export-collection">Colección</label>
+        <label htmlFor="export-collection">Qué exportar</label>
         <select
           id="export-collection"
           value={exportId}
           onChange={(event) => setExportId(event.target.value)}>
-          {!selected && (
+          {!selected && !exportAll && (
             <option value={exportId} disabled>
               Elige una colección
             </option>
           )}
+          <option value="">Todas las colecciones ({groups.length})</option>
           {groups.map((group) => (
             <option key={group.id} value={group.id}>
               {group.name}

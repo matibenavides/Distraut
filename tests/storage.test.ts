@@ -3,7 +3,8 @@ import { beforeEach, test } from "node:test"
 
 import {
   MAX_COLLECTION_JSON_BYTES,
-  serializeCollectionJson
+  serializeCollectionJson,
+  serializeCollectionsJson
 } from "../lib/collection-json"
 import {
   collectionVisibleForType,
@@ -18,7 +19,6 @@ import {
   endStudySession,
   getStoredState,
   importCollectionJson,
-  importCollectionList,
   initializeHiddenCounts,
   moveFiltersToCollection,
   recordHiddenCounts,
@@ -112,67 +112,68 @@ test("el atajo para eliminar una carpeta vacía comprueba ambos tipos al guardar
   )
 })
 
-test("una lista de texto o JSON crea filtros del tipo elegido sin repetir entradas", async () => {
-  const words = await importCollectionList(
-    "Juegos",
-    "  Café \r\nCAFE\r\n\r\ndeadlock",
-    "keyword"
+test("el archivo de todas las colecciones conserva contenido, estados, origen y orden", async () => {
+  const first = (await addCollection("Juegos", undefined, "keyword"))
+    .collections![0]
+  const second = (await addCollection("Canales", undefined, "channel"))
+    .collections![1]
+  await addFilter("keyword", "Deadlock", first.id)
+  const populated = await addFilter("channel", "Riot Games", first.id)
+  await setFilterEnabled(populated.filters[0].id, false)
+  await setCollectionEnabled(first.id, false)
+  const before = await addFilter("keyword", "Individual")
+
+  const json = serializeCollectionsJson(before.collections!, before.filters)
+  const document = JSON.parse(json)
+  assert.deepEqual(document.collections, [
+    {
+      name: "Juegos",
+      enabled: false,
+      createdFrom: "keyword",
+      filters: [
+        { type: "keyword", value: "Deadlock", enabled: false },
+        { type: "channel", value: "Riot Games", enabled: true }
+      ]
+    },
+    { name: "Canales", enabled: true, createdFrom: "channel", filters: [] }
+  ])
+  await removeCollection(first.id)
+  await removeCollection(second.id)
+  const restored = await importCollectionJson(json)
+  assert.equal(
+    serializeCollectionsJson(restored.collections!, restored.filters),
+    json
   )
-  const channels = await importCollectionList(
-    "Canales",
-    '["Riot Games","riot games"]',
-    "channel"
-  )
-  const bracket = await importCollectionList(
-    "Etiquetas",
-    "[Guía]\n",
-    "keyword",
-    "text"
-  )
-  assert.deepEqual(
-    words.filters.map((rule) => [rule.type, rule.value]),
-    [
-      ["keyword", "Café"],
-      ["keyword", "deadlock"]
-    ]
-  )
-  assert.deepEqual(
-    channels.filters.slice(2).map((rule) => [rule.type, rule.value]),
-    [["channel", "Riot Games"]]
-  )
-  assert.equal(bracket.filters[3].value, "[Guía]")
+  assert.notEqual(restored.collections![0].id, first.id)
+  assert.notEqual(restored.filters[1].id, before.filters[0].id)
+  assert.deepEqual(restored.filters[0], before.filters[2])
 })
 
-test("un diccionario mixto conserva el tipo y la importación inválida no guarda datos", async () => {
-  const state = await importCollectionList(
-    "Mixta",
-    '{"palabras":["Riot"],"canales":["Riot","RIOT"]}',
-    "keyword"
-  )
-  assert.deepEqual(
-    state.filters.map((rule) => [rule.type, rule.value]),
-    [
-      ["keyword", "Riot"],
-      ["channel", "Riot"]
-    ]
+test("un archivo de varias colecciones se importa completo o se rechaza entero", async () => {
+  const before = await addCollection("Existente")
+  const first = { name: "Nueva", filters: [{ type: "keyword", value: "Café" }] }
+  const pack = (...collections: object[]) =>
+    JSON.stringify({ version: 1, collections })
+  await assert.rejects(importCollectionJson(pack()), /al menos/)
+  await assert.rejects(
+    importCollectionJson(pack(first, { name: " Exístente ", filters: [] })),
+    /Ya existe.*Exístente/
   )
   await assert.rejects(
-    importCollectionList("Mixta", "otro", "keyword"),
-    /Ya existe/
+    importCollectionJson(pack(first, { name: "NUEVA", filters: [] })),
+    /Ya existe.*NUEVA/
   )
   await assert.rejects(
-    importCollectionList("Inválida", '{"palabras":["válida",4]}', "keyword"),
-    /debe ser texto/
+    importCollectionJson(pack(first, { name: "Inválida", filters: [4] })),
+    /inválido/
   )
+  assert.deepEqual(await getStoredState(), before)
+  failWrite = true
   await assert.rejects(
-    importCollectionList("Inválida", "[sin comillas]", "keyword", "json"),
-    /sintaxis/
+    importCollectionJson(pack(first, { name: "Otra", filters: [] })),
+    /guardar/
   )
-  await assert.rejects(
-    importCollectionList("Inválida", "   ", "keyword"),
-    /al menos/
-  )
-  assert.deepEqual(await getStoredState(), state)
+  assert.deepEqual(await getStoredState(), before)
 })
 
 test("JSON conserva palabras, canales y pausas al exportar y volver a importar", async () => {

@@ -3,15 +3,11 @@ import { normalizeFilterValue } from "./filters"
 
 export const MAX_COLLECTION_JSON_BYTES = 1024 * 1024
 
-export interface CollectionDraft {
+interface CollectionDraft {
   name: string
   enabled?: boolean
   createdFrom?: FilterType
   filters: Pick<Filter, "type" | "value" | "enabled">[]
-}
-
-interface CollectionDocument extends CollectionDraft {
-  version: 1
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -22,13 +18,9 @@ function isFilterType(value: unknown): value is FilterType {
   return value === "keyword" || value === "channel"
 }
 
-export function validateCollectionTextSize(text: string) {
+export function parseCollectionsJson(text: string): CollectionDraft[] {
   if (new TextEncoder().encode(text).length > MAX_COLLECTION_JSON_BYTES)
     throw new Error("El contenido supera el máximo de 1 MiB.")
-}
-
-export function parseCollectionJson(text: string): CollectionDocument {
-  validateCollectionTextSize(text)
   let data: unknown
   try {
     data = JSON.parse(text.replace(/^\uFEFF/, ""))
@@ -36,8 +28,19 @@ export function parseCollectionJson(text: string): CollectionDocument {
     throw new Error("El archivo debe contener JSON válido.")
   }
   if (!isRecord(data) || data.version !== 1)
-    throw new Error("Se esperaba una colección JSON con version 1.")
-  if (typeof data.name !== "string" || !Array.isArray(data.filters))
+    throw new Error("Se esperaba un archivo de colecciones con version 1.")
+  if (!("collections" in data)) return [parseCollection(data)]
+  if (!Array.isArray(data.collections) || !data.collections.length)
+    throw new Error("El archivo debe contener al menos una colección.")
+  return data.collections.map(parseCollection)
+}
+
+function parseCollection(data: unknown): CollectionDraft {
+  if (
+    !isRecord(data) ||
+    typeof data.name !== "string" ||
+    !Array.isArray(data.filters)
+  )
     throw new Error("La colección requiere un nombre y una lista de filtros.")
   if (data.enabled !== undefined && typeof data.enabled !== "boolean")
     throw new Error("El estado de la colección debe ser true o false.")
@@ -69,7 +72,6 @@ export function parseCollectionJson(text: string): CollectionDocument {
     }
   })
   return {
-    version: 1,
     name: data.name,
     enabled: data.enabled !== false,
     createdFrom: isFilterType(data.createdFrom) ? data.createdFrom : undefined,
@@ -77,12 +79,11 @@ export function parseCollectionJson(text: string): CollectionDocument {
   }
 }
 
-export function serializeCollectionJson(
+function collectionDraft(
   group: FilterCollection,
   filters: readonly Filter[]
-) {
-  const data: CollectionDocument = {
-    version: 1,
+): CollectionDraft {
+  return {
     name: group.name,
     enabled: group.enabled,
     createdFrom: group.createdFrom,
@@ -90,5 +91,25 @@ export function serializeCollectionJson(
       .filter((filter) => filter.collectionId === group.id)
       .map(({ type, value, enabled }) => ({ type, value, enabled }))
   }
-  return JSON.stringify(data, null, 2) + "\n"
+}
+
+export function serializeCollectionJson(
+  group: FilterCollection,
+  filters: readonly Filter[]
+) {
+  return (
+    JSON.stringify(
+      { version: 1, ...collectionDraft(group, filters) },
+      null,
+      2
+    ) + "\n"
+  )
+}
+
+export function serializeCollectionsJson(
+  groups: readonly FilterCollection[],
+  filters: readonly Filter[]
+) {
+  const collections = groups.map((group) => collectionDraft(group, filters))
+  return JSON.stringify({ version: 1, collections }, null, 2) + "\n"
 }
